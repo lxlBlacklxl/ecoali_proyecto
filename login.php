@@ -10,7 +10,6 @@ session_start();
 
   <link rel="stylesheet" href="assets/css/globals.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <style>
     /* Estilos Premium Re-diseñados EcoAli Login */
@@ -548,71 +547,12 @@ session_start();
 
     </form>
 
-    <div class="divider">
-      <div class="divider-line"></div>
-      <div class="divider-text">O continúa con</div>
-      <div class="divider-line"></div>
-    </div>
-
-    <button class="btn-google" id="googleCustomBtn" type="button">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google logo">
-      Continuar con Google
-    </button>
-
     <div class="register-prompt">
-      ¿No tienes una cuenta?<a href="register.php">Regístrate ahora</a>
+      ¿No tienes una cuenta? <a href="register.php">Regístrate ahora</a>
     </div>
   </main>
 
 </div>
-
-<div id="g_id_onload"
-     data-client_id="610699907925-g8kf8c126tvsncvip1d1dne4h4b55khh.apps.googleusercontent.com"
-     data-callback="handleCredentialResponse">
-</div>
-
-<div id="googleSignInHidden" style="display:none;"></div>
-
-<form id="googleLoginForm" action="forms/google_login.php" method="POST" style="display:none;">
-  <input type="hidden" name="credential" id="credential">
-</form>
-
-<script>
-  function handleCredentialResponse(response) {
-      document.getElementById("credential").value = response.credential;
-      document.getElementById("googleLoginForm").submit();
-  }
-
-  window.onload = function () {
-      google.accounts.id.initialize({
-          client_id: "610699907925-g8kf8c126tvsncvip1d1dne4h4b55khh.apps.googleusercontent.com",
-          callback: handleCredentialResponse
-      });
-
-      google.accounts.id.renderButton(
-          document.getElementById("googleSignInHidden"),
-          {
-              type: "standard",
-              theme: "outline",
-              size: "large",
-              shape: "pill",
-              text: "continue_with",
-              logo_alignment: "left",
-              width: 300
-          }
-      );
-
-      const customBtn = document.getElementById("googleCustomBtn");
-      customBtn.addEventListener("click", function () {
-          const officialGoogleButton = document.querySelector("#googleSignInHidden div[role='button']");
-          if (officialGoogleButton) {
-              officialGoogleButton.click();
-          } else {
-              alert("El botón de Google aún no cargó. Intenta de nuevo.");
-          }
-      });
-  };
-</script>
 
 </body>
 </html>
