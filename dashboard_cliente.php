@@ -1214,66 +1214,18 @@ $codigoReferido = strtoupper($_SESSION["usuario"]);
 
     /* Estilos Responsivos */
     @media (max-width: 991px) {
-      .admin-hamburger, .admin-menu-overlay {
-        display: flex;
-      }
-
       .sidebar {
-        position: fixed !important;
-        top: 0 !important;
-        left: -280px !important;
-        width: 260px !important;
-        height: 100vh !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-        z-index: 9999 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        padding: 30px 20px !important;
-        box-shadow: 10px 0 35px rgba(70,40,0,.15) !important;
-        background: var(--bg-organic) !important;
-        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        display: none !important;
       }
 
-      .sidebar.active {
-        left: 0 !important;
-      }
-
-      .sidebar .brand {
-        font-size: 20px !important;
-        margin-bottom: 30px !important;
-        padding-left: 10px;
-      }
-
-      .sidebar .profile-card {
-        display: flex !important;
-        margin-bottom: 25px !important;
-      }
-
-      .sidebar-menu button span {
-        display: inline !important;
-      }
-
-      .sidebar-menu button {
-        padding: 14px 18px !important;
-        justify-content: flex-start !important;
+      .mobile-nav {
+        display: grid !important;
       }
 
       .main-content {
         margin-left: 0 !important;
-        padding: 85px 20px 24px !important;
+        padding: 24px 20px 84px !important;
         width: 100% !important;
-      }
-    }
-
-    @media (max-width: 767px) {
-      .mobile-nav {
-        display: grid;
-      }
-
-      .main-content {
-        padding: 85px 16px 84px !important;
-        margin-left: 0;
       }
 
       .catalog-search-filters {
