@@ -1214,33 +1214,55 @@ $codigoReferido = strtoupper($_SESSION["usuario"]);
 
     /* Estilos Responsivos */
     @media (max-width: 991px) {
+      .admin-hamburger, .admin-menu-overlay {
+        display: flex;
+      }
+
       .sidebar {
-        width: 70px;
-        padding: 24px 10px;
-        align-items: center;
+        position: fixed !important;
+        top: 0 !important;
+        left: -280px !important;
+        width: 260px !important;
+        height: 100vh !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        z-index: 9999 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 30px 20px !important;
+        box-shadow: 10px 0 35px rgba(70,40,0,.15) !important;
+        background: var(--bg-organic) !important;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      .sidebar.active {
+        left: 0 !important;
       }
 
       .sidebar .brand {
-        font-size: 16px;
-        margin-bottom: 25px;
+        font-size: 20px !important;
+        margin-bottom: 30px !important;
+        padding-left: 10px;
       }
 
       .sidebar .profile-card {
-        display: none;
+        display: flex !important;
+        margin-bottom: 25px !important;
       }
 
       .sidebar-menu button span {
-        display: none;
+        display: inline !important;
       }
 
       .sidebar-menu button {
-        padding: 12px;
-        justify-content: center;
+        padding: 14px 18px !important;
+        justify-content: flex-start !important;
       }
 
       .main-content {
-        margin-left: 70px;
-        padding: 24px;
+        margin-left: 0 !important;
+        padding: 85px 20px 24px !important;
+        width: 100% !important;
       }
     }
 
@@ -1254,8 +1276,8 @@ $codigoReferido = strtoupper($_SESSION["usuario"]);
       }
 
       .main-content {
+        padding: 85px 16px 84px !important;
         margin-left: 0;
-        padding: 20px 16px 84px;
       }
 
       .catalog-search-filters {

@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function() {
-    // Only run if .aside exists
-    const aside = document.querySelector(".aside");
-    if (!aside) return;
+    // Target either .aside or .sidebar
+    const menuElement = document.querySelector(".aside, .sidebar");
+    if (!menuElement) return;
 
     // Create hamburger button
     const hamburger = document.createElement("button");
@@ -23,11 +23,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Toggle menu
     function toggleMenu() {
-        aside.classList.toggle("active");
+        menuElement.classList.toggle("active");
         hamburger.classList.toggle("active");
         overlay.classList.toggle("active");
     }
 
     hamburger.addEventListener("click", toggleMenu);
     overlay.addEventListener("click", toggleMenu);
+
+    // Auto-close menu when sidebar button/link is clicked
+    menuElement.querySelectorAll("button, a").forEach(item => {
+        item.addEventListener("click", () => {
+            if (menuElement.classList.contains("active")) {
+                toggleMenu();
+            }
+        });
+    });
 });

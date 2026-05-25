@@ -113,6 +113,7 @@ if ($proveedor_id > 0) {
   <link rel="stylesheet" href="assets/css/globals.css">
   <link rel="stylesheet" href="assets/css/proveedor.css?v=<?php echo time(); ?>">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <script src="assets/js/admin_menu.js" defer></script>
   <style>
     /* Estilos Corporativos EcoAli Proveedores */
     :root {
@@ -682,33 +683,55 @@ if ($proveedor_id > 0) {
     }
 
     @media (max-width: 991px) {
+      .admin-hamburger, .admin-menu-overlay {
+        display: flex;
+      }
+
       .sidebar {
-        width: 70px;
-        padding: 24px 10px;
-        align-items: center;
+        position: fixed !important;
+        top: 0 !important;
+        left: -280px !important; /* Fully hidden on left */
+        width: 260px !important;
+        height: 100vh !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        z-index: 9999 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 30px 20px !important;
+        box-shadow: 10px 0 35px rgba(70,40,0,.15) !important;
+        background: var(--bg-organic) !important;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      .sidebar.active {
+        left: 0 !important;
       }
 
       .sidebar .brand {
-        font-size: 14px;
-        margin-bottom: 25px;
+        font-size: 20px !important;
+        margin-bottom: 30px !important;
+        padding-left: 10px;
       }
 
       .sidebar .profile-card {
-        display: none;
+        display: flex !important;
+        margin-bottom: 25px !important;
       }
 
       .sidebar-menu button span {
-        display: none;
+        display: inline !important;
       }
 
       .sidebar-menu button {
-        padding: 12px;
-        justify-content: center;
+        padding: 14px 18px !important;
+        justify-content: flex-start !important;
       }
 
       .main-content {
-        margin-left: 70px;
-        padding: 24px;
+        margin-left: 0 !important;
+        padding: 85px 20px 24px !important; /* Extra top padding to clear floating hamburger */
+        width: 100% !important;
       }
     }
 
@@ -719,17 +742,12 @@ if ($proveedor_id > 0) {
     }
 
     @media (max-width: 767px) {
-      .sidebar {
-        display: none;
-      }
-
       .mobile-nav {
         display: grid;
       }
 
       .main-content {
-        margin-left: 0;
-        padding: 20px 16px 84px;
+        padding: 85px 16px 84px !important; /* Clear bottom nav and top hamburger */
       }
 
       .form-grid {

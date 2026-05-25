@@ -55,3 +55,60 @@ img {
 body {
   overflow-x: hidden;
 }
+
+/* Shared Hamburger and Slide drawer styles for responsive menus */
+.admin-hamburger {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid rgba(213, 164, 112, 0.25);
+  box-shadow: 0 8px 20px rgba(70,40,0,.08);
+  z-index: 10000;
+  cursor: pointer;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-hamburger .bar {
+  width: 20px;
+  height: 2.5px;
+  background-color: #8d4a00;
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-hamburger.active .bar:nth-child(1) {
+  transform: translateY(7.5px) rotate(45deg);
+}
+.admin-hamburger.active .bar:nth-child(2) {
+  opacity: 0;
+}
+.admin-hamburger.active .bar:nth-child(3) {
+  transform: translateY(-7.5px) rotate(-45deg);
+}
+
+.admin-menu-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 25, 5, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.admin-menu-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
