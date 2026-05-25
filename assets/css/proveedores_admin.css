@@ -1454,8 +1454,49 @@
     right: auto !important;
   }
 
+  .gestin-de .header-topappbar {
+    height: auto !important;
+    min-height: 80px !important;
+    padding: 16px 20px 16px 80px !important; /* Reserves 80px space on left for hamburger button */
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    background: rgba(255, 245, 237, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border-bottom: 1px solid rgba(213, 164, 112, 0.15) !important;
+    border-radius: 20px !important;
+    margin-bottom: 15px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .gestin-de .header-topappbar .div-4 {
+    width: 100% !important;
+  }
+
+  .gestin-de .text-26 {
+    font-size: 20px !important;
+    line-height: 1.3 !important;
+    text-align: left !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+  }
+
+  .gestin-de .header-topappbar .button-2,
+  .gestin-de .header-topappbar > div:last-child {
+    margin-top: 4px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
   .gestin-de .main-content {
-    padding: 80px 10px 70px !important; /* Leave top space for floating hamburger button */
+    padding: 20px 10px 70px !important; /* Clean content padding since top spacing is handled by header */
   }
 
   .gestin-de .section-search {
