@@ -36,7 +36,7 @@ session_start();
 
     body {
       font-family: 'Manrope', sans-serif;
-      background-color: #121312;
+      background-color: var(--bg-organic);
       color: var(--text-dark);
       min-height: 100vh;
       display: flex;
@@ -61,7 +61,7 @@ session_start();
       left: -10%;
       width: 50%;
       height: 60%;
-      background: radial-gradient(circle, rgba(255, 138, 0, 0.09) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(255, 138, 0, 0.14) 0%, transparent 70%);
       animation: rotateGlow 25s infinite linear;
     }
 
@@ -71,7 +71,7 @@ session_start();
       right: -10%;
       width: 55%;
       height: 60%;
-      background: radial-gradient(circle, rgba(23, 106, 33, 0.09) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(23, 106, 33, 0.12) 0%, transparent 70%);
       animation: rotateGlow 30s infinite linear reverse;
     }
 
