@@ -48,9 +48,9 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
 /* Estilos específicos y optimizados para la Tabla de Usuarios */
 .gestin-de-inventario .row-usuario-header,
 .gestin-de-inventario .row-usuario {
-  display: grid !important;
-  grid-template-columns: 1.1fr 1.7fr 1.5fr 2.2fr 1.2fr 1.2fr 1.1fr 0.8fr 1.1fr !important;
-  align-items: center !important;
+  display: grid;
+  grid-template-columns: 1.1fr 1.7fr 1.5fr 2.2fr 1.2fr 1.2fr 1.1fr 0.8fr 1.1fr;
+  align-items: center;
 }
 
 .gestin-de-inventario .row-usuario-header > div,
@@ -506,15 +506,31 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Búsqueda en tiempo real por texto
+// Búsqueda en tiempo real combinada con filtro de rol
 function filtrarTabla() {
     const query = document.getElementById('buscarUsuario').value.toLowerCase();
+    
+    // Obtener el rol actualmente seleccionado
+    const activeBtn = document.querySelector('.background-shadow button.button');
+    let activeRol = 'todos';
+    if (activeBtn) {
+        const onclickAttr = activeBtn.getAttribute('onclick') || '';
+        if (onclickAttr.includes("'1'")) activeRol = '1';
+        else if (onclickAttr.includes("'2'")) activeRol = '2';
+        else if (onclickAttr.includes("'3'")) activeRol = '3';
+        else if (onclickAttr.includes("'4'")) activeRol = '4';
+    }
+
     const rows = document.querySelectorAll('#tablaCuerpo .row-usuario');
     let visibleCount = 0;
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        if (text.includes(query)) {
+        const rRol = row.getAttribute('data-rol');
+        const matchesQuery = text.includes(query);
+        const matchesRol = (activeRol === 'todos' || rRol === activeRol);
+
+        if (matchesQuery && matchesRol) {
             row.style.display = 'grid';
             visibleCount++;
         } else {
@@ -527,7 +543,7 @@ function filtrarTabla() {
 
 // Filtro rápido por rol
 function filtrarRol(rol, btn) {
-    // Actualizar botones de filtro
+    // Actualizar estilos de los botones de filtro
     const buttons = document.querySelectorAll('.background-shadow button');
     buttons.forEach(b => {
         b.className = 'div-wrapper';
@@ -541,20 +557,8 @@ function filtrarRol(rol, btn) {
         btn.querySelector('div').className = 'text';
     }
 
-    const rows = document.querySelectorAll('#tablaCuerpo .row-usuario');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        const rRol = row.getAttribute('data-rol');
-        if (rol === 'todos' || rRol === rol) {
-            row.style.display = 'grid';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} CUENTAS`;
+    // Ejecutar filtro combinado
+    filtrarTabla();
 }
 </script>
 </body>
