@@ -1267,10 +1267,6 @@ $codigoReferido = strtoupper($_SESSION["usuario"]);
     }
 
     @media (max-width: 767px) {
-      .sidebar {
-        display: none;
-      }
-
       .mobile-nav {
         display: grid;
       }

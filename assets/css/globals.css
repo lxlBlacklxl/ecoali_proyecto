@@ -117,9 +117,11 @@ body {
 @media (max-width: 991px) {
   .admin-hamburger {
     display: flex !important; /* Visible on tablet and mobile! */
+    z-index: 9999999 !important;
   }
   .admin-menu-overlay {
     display: block !important;
+    z-index: 9999997 !important;
   }
 
   /* UNIVERSAL DRAWER SIDEPANELS (for tablet & mobile viewports) */
@@ -132,7 +134,7 @@ body {
     height: 100vh !important;
     margin: 0 !important;
     border-radius: 0 !important;
-    z-index: 9999 !important;
+    z-index: 9999998 !important;
     display: flex !important;
     flex-direction: column !important;
     padding: 80px 20px 30px !important; /* Safe top padding to clear floating hamburger */
