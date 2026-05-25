@@ -558,8 +558,8 @@ session_start();
       <div id="g_id_onload"
            data-client_id="610699907925-g8kf8c126tvsncvip1d1dne4h4b55khh.apps.googleusercontent.com"
            data-context="signin"
-           data-ux_mode="redirect"
-           data-login_uri="http://localhost/ecoali_proyecto/forms/google_login.php"
+           data-ux_mode="popup"
+           data-callback="manejarAutenticacionGoogle"
            data-auto_prompt="false">
       </div>
       <div class="g_id_signin"
@@ -572,6 +572,24 @@ session_start();
            data-width="370">
       </div>
     </div>
+
+    <script>
+      function manejarAutenticacionGoogle(response) {
+        // Generar un formulario temporal para enviar las credenciales encriptadas de forma segura por POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'forms/google_login.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'credential';
+        input.value = response.credential;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+      }
+    </script>
 
     <p class="register-prompt">
       ¿No tienes una cuenta aún?
