@@ -1,19 +1,32 @@
 <?php
+/**
+ * --------------------------------------------------------------------------------
+ * ECOALI - CONECTOR MAESTRO DE BASE DE DATOS Y SERVICIOS GLOBALES
+ * --------------------------------------------------------------------------------
+ * Este script establece el canal de comunicación seguro a través del controlador
+ * nativo MySQLi en modo orientado a objetos. Además, realiza migraciones automáticas
+ * autogenerando tablas esenciales (bitácora, regalías) si no existen, y expone la
+ * función de auditoría universal `registrar_bitacora`.
+ */
 
+// 1. CONFIGURACIÓN DE PARÁMETROS DEL SERVIDOR DE BASE DE DATOS
 $host = "localhost";
 $usuario = "root";
 $password = "";
 $bd = "ecoali";
 
+// 2. CREACIÓN DE LA INSTANCIA DE CONEXIÓN CON MYSQLI
 $conn = new mysqli($host, $usuario, $password, $bd);
 
+// 3. CONTROL DE FALLOS DE CONEXIÓN A BASE DE DATOS
 if ($conn->connect_error) {
-    die("Error de conexión: " . $conn->connect_error);
+    die("Error crítico de conexión a la base de datos: " . $conn->connect_error);
 }
 
+// 4. CONFIGURACIÓN DEL JUEGO DE CARACTERES A UTF-8 SEGURO (Multibyte)
 $conn->set_charset("utf8mb4");
 
-// 1. Crear automáticamente la tabla de Bitácora si no existe
+// 5. MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE BITÁCORA SI NO EXISTE
 $conn->query("CREATE TABLE IF NOT EXISTS `bitacora` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `usuario_id` INT NOT NULL,
@@ -25,7 +38,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS `bitacora` (
     `creado_en` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
-// 2. Crear automáticamente la tabla de Regalías si no existe
+// 6. MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE REGALÍAS SI NO EXISTE
 $conn->query("CREATE TABLE IF NOT EXISTS `regalias` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `usuario_beneficiado_id` INT NOT NULL,
@@ -37,15 +50,22 @@ $conn->query("CREATE TABLE IF NOT EXISTS `regalias` (
     `fecha` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
-// Alterar columna estado de la tabla pedidos para incluir 'preparado'
+// 7. COMPATIBILIDAD LOGÍSTICA: MODIFICAR ENUM DE ESTADOS DE PEDIDO
 $conn->query("ALTER TABLE pedidos MODIFY COLUMN estado ENUM('pendiente','preparado','en_ruta','entregado','cancelado') DEFAULT 'pendiente'");
 
-// 3. Función auxiliar global para registrar acciones en la Bitácora
+// 8. FUNCIÓN AUXILIAR DE REGISTRO EN BITÁCORA (AUDITORÍA INTERNA)
 if (!function_exists('registrar_bitacora')) {
+    /**
+     * Registra una acción relevante realizada en el sistema para fines de auditoría.
+     * 
+     * @param string $accion El nombre identificador del evento (ej. "Inicio de Sesión").
+     * @param string $modulo El nombre del módulo donde ocurre (ej. "Usuarios", "Clientes").
+     * @param string $descripcion Detalle explicativo de la operación efectuada.
+     */
     function registrar_bitacora($accion, $modulo, $descripcion) {
         global $conn;
         
-        // Iniciar sesión solo si no está ya activa
+        // 8.1 Iniciar sesión del usuario si no está activa para obtener su identidad
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -54,6 +74,7 @@ if (!function_exists('registrar_bitacora')) {
         $fecha = date('Y-m-d');
         $hora = date('H:i:s');
         
+        // 8.2 Insertar de forma segura empleando Prepared Statements
         $stmt = $conn->prepare("INSERT INTO bitacora (usuario_id, accion_realizada, modulo_afectado, descripcion, fecha, hora) VALUES (?, ?, ?, ?, ?, ?)");
         if ($stmt) {
             $stmt->bind_param("isssss", $usuario_id, $accion, $modulo, $descripcion, $fecha, $hora);
