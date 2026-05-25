@@ -100,9 +100,7 @@ body {
   display: none; /* Hidden on desktop by default */
   position: fixed;
   inset: 0;
-  background: rgba(40, 25, 5, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(23, 10, 0, 0.35); /* Elegant warm dark tint */
   z-index: 9998;
   opacity: 0;
   pointer-events: none;
