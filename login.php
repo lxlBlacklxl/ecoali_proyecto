@@ -10,6 +10,7 @@ session_start();
 
   <link rel="stylesheet" href="assets/css/globals.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <style>
     /* Estilos Premium Re-diseñados EcoAli Login */
@@ -553,10 +554,24 @@ session_start();
       <div class="divider-line"></div>
     </div>
 
-    <button type="button" class="btn-google" onclick="alert('El inicio de sesión único con Google se encuentra en fase de validación por API de seguridad. Por favor, utiliza tus credenciales locales.')">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo" />
-      Iniciar sesión con Google
-    </button>
+    <div style="width: 100%; display: flex; justify-content: center; overflow: hidden; margin-top: 5px;">
+      <div id="g_id_onload"
+           data-client_id="610699907925-g8kf8c126tvsncvip1d1dne4h4b55khh.apps.googleusercontent.com"
+           data-context="signin"
+           data-ux_mode="redirect"
+           data-login_uri="http://localhost/ecoali_proyecto/forms/google_login.php"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-shape="rectangular"
+           data-theme="outline"
+           data-text="signin_with"
+           data-size="large"
+           data-logo_alignment="left"
+           data-width="370">
+      </div>
+    </div>
 
     <p class="register-prompt">
       ¿No tienes una cuenta aún?
