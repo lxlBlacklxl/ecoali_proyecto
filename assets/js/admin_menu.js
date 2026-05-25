@@ -13,13 +13,13 @@ document.addEventListener("DOMContentLoaded", function() {
         <span class="bar"></span>
     `;
     
-    // Insert hamburger into body
-    document.body.appendChild(hamburger);
+    // Insert hamburger into parent container to align stacking context
+    menuElement.parentElement.appendChild(hamburger);
 
-    // Create overlay
+    // Create overlay inside parent container
     const overlay = document.createElement("div");
     overlay.className = "admin-menu-overlay";
-    document.body.appendChild(overlay);
+    menuElement.parentElement.appendChild(overlay);
 
     // Toggle menu
     function toggleMenu() {
