@@ -51,6 +51,7 @@ $produccion_mensual = [
 <link rel="stylesheet" href="assets/css/globals.css">
 <link rel="stylesheet" href="assets/css/inventario_admin.css?v=<?php echo time(); ?>">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<script src="assets/js/admin_menu.js" defer></script>
 <style>
   .bar-chart {
       display: flex;

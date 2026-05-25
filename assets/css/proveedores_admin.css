@@ -1410,68 +1410,52 @@
     width: calc(100% - 20px) !important;
   }
 
-  /* Aside top bar transformation */
+  /* Aside as a collapsible lateral drawer */
   .gestin-de .aside {
-    position: relative !important;
+    position: fixed !important;
     top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    border-radius: 0 0 30px 30px !important;
-    padding: 20px 15px 15px !important;
+    left: -290px !important; /* Fully hidden on left */
+    width: 280px !important;
+    height: 100vh !important;
+    border-radius: 0 34px 34px 0 !important;
+    padding: 80px 20px 30px !important; /* Top padding to avoid hamburger overlapping */
+    box-shadow: 20px 0 50px rgba(70,40,0,.15) !important;
+    z-index: 9999 !important;
+    transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 15px !important;
-    box-shadow: 0 12px 40px rgba(70,40,0,.06) !important;
   }
 
-  /* Compact branding, avatar, logout header */
-  .gestin-de .container-13 {
-    padding: 0 10px 0 !important;
-    margin-bottom: 0 !important;
-    justify-content: space-between !important;
-    width: 100% !important;
+  /* When active, slide in drawer! */
+  .gestin-de .aside.active {
+    left: 0 !important;
   }
 
-  /* Subhead wrap */
-  .gestin-de .margin-2 {
-    display: none !important; /* Hide details on mobile to save vertical space */
-  }
-
-  /* Transform vertical menu to horizontal scrollable tabs */
+  /* Restore normal vertical navigation layout inside drawer */
   .gestin-de .nav {
     display: flex !important;
-    flex-direction: row !important;
-    gap: 8px !important;
-    max-height: none !important;
-    overflow-x: auto !important;
-    padding: 5px 2px 10px !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    max-height: calc(100vh - 220px) !important;
+    overflow-y: auto !important;
     width: 100% !important;
-    scrollbar-width: none !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-  .gestin-de .nav::-webkit-scrollbar {
-    display: none !important;
   }
 
-  .gestin-de .link,
-  .gestin-de .link-active-state {
-    padding: 8px 16px !important;
-    flex-shrink: 0 !important;
-    white-space: nowrap !important;
+  .gestin-de .margin-2 {
+    display: block !important; /* Show avatar profile inside drawer */
   }
 
-  /* Logout button wrapper placement */
   .gestin-de .button-wrapper {
     position: absolute !important;
-    right: 15px !important;
-    top: 20px !important;
-    bottom: auto !important;
-    left: auto !important;
+    bottom: 28px !important;
+    left: 28px !important;
+    top: auto !important;
+    right: auto !important;
   }
 
   .gestin-de .main-content {
-    padding: 20px 10px 70px !important;
+    padding: 80px 10px 70px !important; /* Leave top space for floating hamburger button */
   }
 
   .gestin-de .section-search {
