@@ -546,6 +546,22 @@ session_start();
       </button>
 
     </form>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span class="divider-text">O continúa con</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <button type="button" class="btn-google" onclick="alert('El inicio de sesión único con Google se encuentra en fase de validación por API de seguridad. Por favor, utiliza tus credenciales locales.')">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo" />
+      Iniciar sesión con Google
+    </button>
+
+    <p class="register-prompt">
+      ¿No tienes una cuenta aún?
+      <a href="register.php">Regístrate ahora</a>
+    </p>
   </main>
 
 </div>
