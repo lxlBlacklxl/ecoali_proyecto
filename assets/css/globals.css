@@ -97,7 +97,7 @@ body {
 }
 
 .admin-menu-overlay {
-  display: none; /* Hidden on desktop by default */
+  display: none !important; /* Hidden completely by default to prevent blocking clicks */
   position: fixed;
   inset: 0;
   background: rgba(23, 10, 0, 0.35); /* Elegant warm dark tint */
@@ -107,8 +107,10 @@ body {
   transition: opacity 0.3s ease;
 }
 .admin-menu-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
+  display: block !important; /* Shown only when active! */
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 9999997 !important;
 }
 
 /* RESPONSIVE LAYOUT FOR TABLETS & MOBILE (<= 991px) */
@@ -116,10 +118,6 @@ body {
   .admin-hamburger {
     display: flex !important; /* Visible on tablet and mobile! */
     z-index: 9999999 !important;
-  }
-  .admin-menu-overlay {
-    display: block !important;
-    z-index: 9999997 !important;
   }
 
   /* UNIVERSAL DRAWER SIDEPANELS (for tablet & mobile viewports) */
