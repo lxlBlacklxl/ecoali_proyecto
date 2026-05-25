@@ -57,11 +57,11 @@ body {
 }
 
 .gestin-de-inventario .aside {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: fixed;
+  top: 18px;
+  left: 18px;
   width: 250px;
-  height: 100%;
+  height: calc(100vh - 36px);
   background: rgba(255,245,237,.92);
   border-radius: 0 34px 34px 0;
   padding: 30px 18px;
@@ -114,7 +114,13 @@ body {
 .gestin-de-inventario .nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.gestin-de-inventario .nav::-webkit-scrollbar {
+  display: none;
 }
 
 .gestin-de-inventario .link,
@@ -659,3 +665,203 @@ body {
     min-width: 1000px;
   }
 }
+
+/* ==========================================================================
+   MODALES PREMIUM Y ALERTAS - ECOALI
+   ========================================================================== */
+
+/* Alertas persistentes */
+.alert-container {
+  margin-bottom: 20px;
+  width: 100%;
+}
+.alert {
+  padding: 14px 20px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+  animation: slideInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.alert-success {
+  background: rgba(157, 241, 151, 0.3);
+  color: #176a21;
+  border: 1px solid rgba(157, 241, 151, 0.6);
+}
+.alert-danger {
+  background: rgba(249, 86, 48, 0.15);
+  color: #b02500;
+  border: 1px solid rgba(249, 86, 48, 0.3);
+}
+
+/* Overlay del modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(40, 25, 5, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Contenedor del modal */
+.modal-container {
+  background: rgba(255, 245, 237, 0.98);
+  border: 1px solid rgba(213, 164, 112, 0.25);
+  border-radius: 30px;
+  padding: 34px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 30px 70px rgba(70, 40, 0, 0.25);
+  transform: translateY(30px) scale(0.96);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-overlay.active .modal-container {
+  transform: translateY(0) scale(1);
+}
+
+/* Elementos internos */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.modal-title {
+  color: #176a21;
+  font-size: 20px;
+  font-weight: 900;
+}
+.modal-close {
+  background: rgba(70, 40, 0, 0.08);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: #462800;
+  font-weight: 800;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.modal-close:hover {
+  background: rgba(70, 40, 0, 0.16);
+  transform: scale(1.05);
+}
+
+/* Formularios elegantes */
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-label {
+  color: #7a5427;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.form-input, .form-select {
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(213, 164, 112, 0.4);
+  background: #fff;
+  padding: 0 16px;
+  color: #462800;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: #ff8a00;
+  box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.12);
+}
+
+/* Botones de acción */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}
+.btn-cancel {
+  border: none;
+  background: rgba(70, 40, 0, 0.06);
+  color: #7a5427;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-cancel:hover {
+  background: rgba(70, 40, 0, 0.12);
+}
+.btn-submit {
+  border: none;
+  background: linear-gradient(90deg, #8d4a00, #ff8a00);
+  color: #fff;
+  padding: 13px 26px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(141, 74, 0, 0.15);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.btn-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(141, 74, 0, 0.25);
+}
+
+/* Animaciones */
+@keyframes slideInDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Ajustes menores para los iconos de acciones en tablas */
+.action-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  padding: 2px 6px;
+}
+.action-btn:hover {
+  transform: scale(1.2);
+}
+.action-btn-edit {
+  color: #ff8a00;
+}
+.action-btn-delete {
+  color: #b02500;
+}
