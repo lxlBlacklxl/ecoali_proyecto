@@ -121,10 +121,29 @@ body {
   }
   .mobile-nav {
     display: grid !important;
+    height: 78px !important; /* Taller premium bar */
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: 0 -8px 30px rgba(70, 40, 0, 0.08) !important;
+    border-top: 1px solid rgba(213, 164, 112, 0.15) !important;
+    z-index: 999999 !important;
+  }
+  .mobile-nav-btn {
+    gap: 6px !important;
+    font-size: 13px !important; /* Larger text */
+    font-weight: 800 !important;
+  }
+  .mobile-nav-btn span {
+    font-size: 26px !important; /* Much larger icons! */
+    transition: transform 0.2s ease !important;
+  }
+  .mobile-nav-btn.active span {
+    transform: scale(1.15) !important; /* micro-zoom animation */
   }
   .main-content {
     margin-left: 0 !important;
-    padding: 24px 20px 84px !important; /* safe spacing to clear bottom navigation bar */
+    padding: 24px 20px 96px !important; /* safe spacing to clear taller bottom navigation bar */
     width: 100% !important;
   }
 
