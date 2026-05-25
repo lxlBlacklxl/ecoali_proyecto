@@ -546,10 +546,6 @@ session_start();
       </button>
 
     </form>
-
-    <div class="register-prompt">
-      ¿No tienes una cuenta? <a href="register.php">Regístrate ahora</a>
-    </div>
   </main>
 
 </div>
