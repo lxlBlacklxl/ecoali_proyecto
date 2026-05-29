@@ -1099,20 +1099,20 @@ if (!empty($pedidos)) {
         <form id="stripe-sim-form" onsubmit="submitCheckoutSimulated(event)">
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div style="grid-column:1/-1; display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:10px; font-weight:800; color:var(--text-medium);">NÚMERO DE TARJETA</label>
-              <input type="text" id="cc-number" placeholder="4000 1234 5678 9010" required maxlength="19" onkeyup="updateCCFront()" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
+              <label style="font-size:10px; font-weight:800; color:var(--text-medium);">NÚMERO DE TARJETA (18 DÍGITOS)</label>
+              <input type="text" id="cc-number" placeholder="400012345678901012" required maxlength="18" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
             </div>
             <div style="grid-column:1/-1; display:flex; flex-direction:column; gap:4px;">
               <label style="font-size:10px; font-weight:800; color:var(--text-medium);">NOMBRE EN TARJETA</label>
-              <input type="text" id="cc-name" placeholder="Ej: JORGE LUIS" required onkeyup="updateCCFront()" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
+              <input type="text" id="cc-name" placeholder="Ej: JORGE LUIS" required style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
               <label style="font-size:10px; font-weight:800; color:var(--text-medium);">EXPIRACIÓN</label>
-              <input type="text" id="cc-exp" placeholder="MM/YY" required maxlength="5" onkeyup="updateCCFront()" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
+              <input type="text" id="cc-exp" placeholder="MM/YY" required maxlength="5" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
               <label style="font-size:10px; font-weight:800; color:var(--text-medium);">CVV</label>
-              <input type="text" id="cc-cvv" placeholder="123" required maxlength="3" onfocus="flipCC(true)" onblur="flipCC(false)" onkeyup="updateCCFront()" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
+              <input type="text" id="cc-cvv" placeholder="123" required maxlength="3" onfocus="flipCC(true)" onblur="flipCC(false)" style="height:44px; border-radius:10px; border:1px solid var(--glass-border); padding:0 12px;">
             </div>
           </div>
 
@@ -1211,6 +1211,55 @@ if (!empty($pedidos)) {
       updateCartUI();
       renderNotifications();
       updateNotifBadge();
+
+      // Validaciones y formateadores en tiempo real para tarjeta de crédito
+      const numInput = document.getElementById('cc-number');
+      if (numInput) {
+          numInput.addEventListener('input', (e) => {
+              let val = e.target.value.replace(/\D/g, '');
+              if (val.length > 18) {
+                  val = val.slice(0, 18);
+              }
+              e.target.value = val;
+              updateCCFront();
+          });
+      }
+
+      const nameInput = document.getElementById('cc-name');
+      if (nameInput) {
+          nameInput.addEventListener('input', (e) => {
+              let val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+              e.target.value = val;
+              updateCCFront();
+          });
+      }
+
+      const expInput = document.getElementById('cc-exp');
+      if (expInput) {
+          expInput.addEventListener('input', (e) => {
+              let val = e.target.value.replace(/\D/g, '');
+              if (val.length > 4) {
+                  val = val.slice(0, 4);
+              }
+              if (val.length > 2) {
+                  val = val.slice(0, 2) + '/' + val.slice(2);
+              }
+              e.target.value = val;
+              updateCCFront();
+          });
+      }
+
+      const cvvInput = document.getElementById('cc-cvv');
+      if (cvvInput) {
+          cvvInput.addEventListener('input', (e) => {
+              let val = e.target.value.replace(/\D/g, '');
+              if (val.length > 3) {
+                  val = val.slice(0, 3);
+              }
+              e.target.value = val;
+              updateCCFront();
+          });
+      }
   });
 
   // Switch de Pestañas
@@ -1580,28 +1629,48 @@ if (!empty($pedidos)) {
   }
 
   function formatCCNumber(value) {
-      const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-      const matches = v.match(/\d{4,16}/g);
-      const match = matches && matches[0] || '';
+      const v = value.replace(/\D/g, '');
       const parts = [];
-
-      for (let i=0, len=match.length; i<len; i+=4) {
-          parts.push(match.substring(i, i+4));
+      for (let i = 0; i < v.length; i += 4) {
+          parts.push(v.substring(i, i + 4));
       }
-
-      if (parts.length > 0) {
-          return parts.join(' ');
-      } else {
-          return value;
-      }
+      return parts.join(' ');
   }
 
   // Simular envío final (Checkout)
   function submitCheckoutSimulated(e) {
       e.preventDefault();
       
+      const num = document.getElementById('cc-number').value.trim();
+      const name = document.getElementById('cc-name').value.trim();
+      const exp = document.getElementById('cc-exp').value.trim();
+      const cvv = document.getElementById('cc-cvv').value.trim();
+
+      // Validar número de tarjeta: obligatorio y exactamente 18 dígitos
+      if (!/^[0-9]{18}$/.test(num)) {
+          showAlertModal('Error de Validación', 'El número de tarjeta debe contener exactamente 18 dígitos numéricos.', '✗', '#b02500');
+          return;
+      }
+
+      // Validar nombre: obligatorio, solo letras y espacios
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(name)) {
+          showAlertModal('Error de Validación', 'El nombre en la tarjeta debe contener únicamente letras.', '✗', '#b02500');
+          return;
+      }
+
+      // Validar expiración: obligatorio formato MM/YY
+      if (!/^(0[1-9]|1[0-2])\/[0-9]{2}$/.test(exp)) {
+          showAlertModal('Error de Validación', 'La fecha de vencimiento debe estar en formato MM/YY (Mes válido 01-12).', '✗', '#b02500');
+          return;
+      }
+
+      // Validar CVV: obligatorio y exactamente 3 dígitos
+      if (!/^[0-9]{3}$/.test(cvv)) {
+          showAlertModal('Error de Validación', 'El CVV debe contener exactamente 3 dígitos numéricos.', '✗', '#b02500');
+          return;
+      }
+
       const btn = document.getElementById('btn-pay-submit');
-      const oldTxt = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = `<span style="display:inline-block; animation:spin 1s linear infinite; margin-right:8px;">⏳</span> Procesando Pago Stripe...`;
 
