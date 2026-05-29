@@ -672,7 +672,7 @@ if (!empty($pedidos)) {
         <!-- Botón de Notificaciones (Requirement 5) -->
         <div onclick="toggleNotifications(true)" style="position:relative; background:white; border:1px solid var(--glass-border); width:50px; height:50px; border-radius:16px; display:grid; place-items:center; font-size:20px; cursor:pointer; box-shadow:var(--shadow-premium); transition:var(--transition-fast);">
           🔔
-          <span id="notif-counter" style="position:absolute; top:-6px; right:-6px; background:#b02500; color:white; font-size:10px; font-weight:800; min-width:20px; height:20px; padding:0 5px; border-radius:50%; display:grid; place-items:center; border:2px solid var(--bg-organic); box-shadow:0 5px 10px rgba(176,37,0,0.3);"><?php echo count($notificaciones); ?></span>
+          <span id="notif-counter" style="position:absolute; top:-6px; right:-6px; background:#b02500; color:white; font-size:10px; font-weight:800; min-width:20px; height:20px; padding:0 5px; border-radius:50%; display:none; place-items:center; border:2px solid var(--bg-organic); box-shadow:0 5px 10px rgba(176,37,0,0.3);"><?php echo count($notificaciones); ?></span>
         </div>
 
         <!-- Botón de Carrito -->
@@ -960,6 +960,11 @@ if (!empty($pedidos)) {
   <div style="flex-grow:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:16px;" id="notif-items-container">
     <!-- Cargado vía JavaScript -->
   </div>
+  <div style="padding:16px 24px; background:white; border-top:1px solid var(--glass-border); display:flex; justify-content:center;">
+    <button onclick="clearAllNotifications()" style="width:100%; height:46px; border-radius:12px; border:1px solid #b02500; background:transparent; color:#b02500; font-size:13px; font-weight:800; cursor:pointer; transition:var(--transition-fast);" onmouseover="this.style.background='#b02500'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#b02500';">
+      🗑 Borrar Todas las Notificaciones
+    </button>
+  </div>
 </div>
 
 <!-- Carrito Drawer -->
@@ -1198,9 +1203,14 @@ if (!empty($pedidos)) {
   var ecoaliCart = JSON.parse(localStorage.getItem('ecoali_cart_' + <?php echo $cliente_id; ?>)) || [];
   var selectedPayment = 'stripe';
 
+  // Gestión de estado local de notificaciones (leídas y borradas)
+  var readNotifIds = JSON.parse(localStorage.getItem('ecoali_read_notifs_' + <?php echo $cliente_id; ?>)) || [];
+  var deletedNotifIds = JSON.parse(localStorage.getItem('ecoali_deleted_notifs_' + <?php echo $cliente_id; ?>)) || [];
+
   document.addEventListener('DOMContentLoaded', () => {
       updateCartUI();
       renderNotifications();
+      updateNotifBadge();
   });
 
   // Switch de Pestañas
@@ -1318,14 +1328,37 @@ if (!empty($pedidos)) {
           drawer.classList.add('active');
           overlay.classList.add('active');
           
-          // Ocultar/quitar el número de notificaciones al abrir
-          const counter = document.getElementById('notif-counter');
-          if (counter) {
-              counter.style.display = 'none';
-          }
+          // Al abrir las notificaciones se marcan todas las no borradas como leídas
+          const activeNotifs = ecoaliNotifications.filter(n => !deletedNotifIds.includes(n.id));
+          activeNotifs.forEach(n => {
+              if (!readNotifIds.includes(n.id)) {
+                  readNotifIds.push(n.id);
+              }
+          });
+          localStorage.setItem('ecoali_read_notifs_' + <?php echo $cliente_id; ?>, JSON.stringify(readNotifIds));
+          updateNotifBadge();
       } else {
           drawer.classList.remove('active');
           overlay.classList.remove('active');
+      }
+  }
+
+  function getUnreadNotifications() {
+      // Filtrar notificaciones que no estén borradas ni leídas
+      const activeNotifs = ecoaliNotifications.filter(n => !deletedNotifIds.includes(n.id));
+      return activeNotifs.filter(n => !readNotifIds.includes(n.id));
+  }
+
+  function updateNotifBadge() {
+      const unread = getUnreadNotifications();
+      const badge = document.getElementById('notif-counter');
+      if (badge) {
+          if (unread.length > 0) {
+              badge.textContent = unread.length;
+              badge.style.display = 'grid';
+          } else {
+              badge.style.display = 'none';
+          }
       }
   }
 
@@ -1333,7 +1366,19 @@ if (!empty($pedidos)) {
       const container = document.getElementById('notif-items-container');
       container.innerHTML = '';
       
-      ecoaliNotifications.forEach(notif => {
+      const activeNotifs = ecoaliNotifications.filter(n => !deletedNotifIds.includes(n.id));
+      
+      if (activeNotifs.length === 0) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:50px 10px; color:var(--text-medium); font-weight:700;">
+              <span style="font-size:36px; display:block; margin-bottom:12px;">🔔</span>
+              No tienes notificaciones actualmente.
+            </div>
+          `;
+          return;
+      }
+
+      activeNotifs.forEach(notif => {
           container.innerHTML += `
             <div class="notif-item ${notif.tipo || 'info'}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1344,6 +1389,24 @@ if (!empty($pedidos)) {
             </div>
           `;
       });
+  }
+
+  function clearAllNotifications() {
+      if (!confirm('¿Estás seguro de que deseas borrar todas las notificaciones?')) return;
+      
+      ecoaliNotifications.forEach(n => {
+          if (!deletedNotifIds.includes(n.id)) {
+              deletedNotifIds.push(n.id);
+          }
+          if (!readNotifIds.includes(n.id)) {
+              readNotifIds.push(n.id);
+          }
+      });
+      localStorage.setItem('ecoali_deleted_notifs_' + <?php echo $cliente_id; ?>, JSON.stringify(deletedNotifIds));
+      localStorage.setItem('ecoali_read_notifs_' + <?php echo $cliente_id; ?>, JSON.stringify(readNotifIds));
+      
+      renderNotifications();
+      updateNotifBadge();
   }
 
   // Gestión del Carrito
