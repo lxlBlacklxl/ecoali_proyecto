@@ -3,24 +3,39 @@ session_start();
 
 if (isset($_GET['rol'])) {
     $rol = (int)$_GET['rol'];
-    $_SESSION['usuario_id'] = 999; // ID de prueba temporaria
     $_SESSION['rol_id'] = $rol;
     
     switch ($rol) {
         case 1:
-            $_SESSION['nombre'] = "Admin Demo";
+            $_SESSION['usuario_id'] = 7;
+            $_SESSION['nombre'] = "jorge";
+            $_SESSION['apellido'] = "vazquez";
+            $_SESSION['email'] = "jorge@ecoali.com";
+            $_SESSION['usuario'] = "JorgeL";
             header("Location: dashboard_admin.php");
             exit;
         case 2:
-            $_SESSION['nombre'] = "Cliente Demo";
+            $_SESSION['usuario_id'] = 12;
+            $_SESSION['nombre'] = "juan";
+            $_SESSION['apellido'] = "";
+            $_SESSION['email'] = "juan@example.com";
+            $_SESSION['usuario'] = "juan";
             header("Location: dashboard_cliente.php");
             exit;
         case 3:
-            $_SESSION['nombre'] = "Proveedor Demo";
+            $_SESSION['usuario_id'] = 3;
+            $_SESSION['nombre'] = "Diego";
+            $_SESSION['apellido'] = "Iram";
+            $_SESSION['email'] = "diego@example.com";
+            $_SESSION['usuario'] = "Diego";
             header("Location: dashboard_proveedor.php");
             exit;
         case 4:
-            $_SESSION['nombre'] = "Repartidor Demo";
+            $_SESSION['usuario_id'] = 14;
+            $_SESSION['nombre'] = "pepe";
+            $_SESSION['apellido'] = "";
+            $_SESSION['email'] = "pepe@example.com";
+            $_SESSION['usuario'] = "pepe";
             header("Location: dashboard_repartidor.php");
             exit;
         default:

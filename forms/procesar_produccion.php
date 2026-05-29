@@ -21,9 +21,10 @@ $producto_id = (int)($input["producto_id"] ?? 0);
 $cantidad = (int)($input["cantidad"] ?? 0);
 $fecha_produccion = trim($input["fecha_produccion"] ?? "");
 $observaciones = trim($input["observaciones"] ?? "");
+$granja_id = (int)($input["granja_id"] ?? 0);
 
-if ($producto_id <= 0 || $cantidad <= 0 || empty($fecha_produccion)) {
-    echo json_encode(["status" => "error", "message" => "Todos los campos obligatorios deben completarse correctamente."]);
+if ($producto_id <= 0 || $cantidad <= 0 || empty($fecha_produccion) || $granja_id <= 0) {
+    echo json_encode(["status" => "error", "message" => "Todos los campos obligatorios deben completarse correctamente, incluyendo la granja de origen."]);
     exit;
 }
 
@@ -45,6 +46,16 @@ try {
     $proveedor_id = (int)$provData["id"];
     $nombre_empresa = $provData["nombre_empresa"];
 
+    // 1.2 Validar que la granja existe y pertenece al proveedor
+    $stmtGranja = $conn->prepare("SELECT nombre FROM granjas WHERE id = ? AND proveedor_id = ?");
+    $stmtGranja->bind_param("ii", $granja_id, $proveedor_id);
+    $stmtGranja->execute();
+    $resGranja = $stmtGranja->get_result();
+    if ($resGranja->num_rows === 0) {
+        throw new Exception("La granja de origen seleccionada no es válida o no pertenece a tu cuenta.");
+    }
+    $granja_nombre = $resGranja->fetch_assoc()["nombre"];
+
     // 2. Validar que el producto existe
     $stmtProd = $conn->prepare("SELECT nombre FROM productos WHERE id = ? AND activo = 1");
     $stmtProd->bind_param("i", $producto_id);
@@ -58,9 +69,9 @@ try {
     $prod_nombre = $resProd->fetch_assoc()["nombre"];
 
     // 3. Registrar en la tabla `produccion`
-    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, fecha_produccion, observaciones) VALUES (?, ?, ?, ?, ?)";
+    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, fecha_produccion, observaciones, granja_id) VALUES (?, ?, ?, ?, ?, ?)";
     $stmtInsertProd = $conn->prepare($sqlInsertProd);
-    $stmtInsertProd->bind_param("iiiss", $proveedor_id, $producto_id, $cantidad, $fecha_produccion, $observaciones);
+    $stmtInsertProd->bind_param("iiissi", $proveedor_id, $producto_id, $cantidad, $fecha_produccion, $observaciones, $granja_id);
     
     if (!$stmtInsertProd->execute()) {
         throw new Exception("Error al registrar la producción: " . $conn->error);
@@ -74,10 +85,10 @@ try {
     $fecha_caducidad = date('Y-m-d', strtotime('+30 days', strtotime($fecha_produccion)));
 
     // 5. Crear lote en `inventario_huevos`
-    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad, fecha_postura, fecha_caducidad, estado)
-                     VALUES (?, ?, ?, ?, ?, ?, 'disponible')";
+    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad, fecha_postura, fecha_caducidad, estado, granja_id)
+                     VALUES (?, ?, ?, ?, ?, ?, 'disponible', ?)";
     $stmtInsertInv = $conn->prepare($sqlInsertInv);
-    $stmtInsertInv->bind_param("iisiss", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_produccion, $fecha_caducidad);
+    $stmtInsertInv->bind_param("iisissi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id);
 
     if (!$stmtInsertInv->execute()) {
         throw new Exception("Error al ingresar el lote al inventario: " . $conn->error);
@@ -88,7 +99,7 @@ try {
     registrar_bitacora(
         "Producción registrada", 
         "Inventario", 
-        "El proveedor '$nCompleto' registró un lote de $cantidad huevos de '$prod_nombre' bajo el código de lote '$codigo_lote'."
+        "El proveedor '$nCompleto' registró un lote de $cantidad huevos de '$prod_nombre' originarios de la granja '$granja_nombre' bajo el código de lote '$codigo_lote'."
     );
 
     $conn->commit();

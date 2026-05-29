@@ -1,7 +1,17 @@
 <?php
+/**
+ * --------------------------------------------------------------------------------
+ * ECOALI - PORTAL PREMIUM DEL PROVEEDOR / GRANJERO
+ * --------------------------------------------------------------------------------
+ * Este panel permite a los productores avícolas gestionar sus granjas, registrar
+ * la postura diaria asociando los lotes a granjas específicas para trazabilidad,
+ * monitorear alertas de stock y caducidad, y consultar la cadena de custodia.
+ */
+
 session_start();
 require "forms/conexion.php";
 
+// 1. CONTROL DE ACCESO
 if (!isset($_SESSION["usuario_id"])) {
     header("Location: login.php");
     exit;
@@ -14,9 +24,7 @@ if ((int)$_SESSION["rol_id"] !== 3) {
 
 $usuario_id = $_SESSION["usuario_id"];
 
-// --- CONSULTAS DINÁMICAS ---
-
-// 1. Obtener perfil completo del proveedor
+// 2. OBTENER PERFIL DEL PROVEEDOR
 $stmtProv = $conn->prepare("SELECT * FROM proveedores WHERE usuario_id = ?");
 $stmtProv->bind_param("i", $usuario_id);
 $stmtProv->execute();
@@ -29,7 +37,7 @@ $telefono = $proveedor["telefono"] ?? "";
 $ubicacion = $proveedor["ubicacion"] ?? "";
 $proveedor_id = $proveedor ? (int)$proveedor["id"] : 0;
 
-// 2. Obtener lista de productos activos para registro de postura
+// 3. OBTENER LISTA DE PRODUCTOS ACTIVOS
 $productosRes = $conn->query("SELECT * FROM productos WHERE activo = 1 ORDER BY nombre ASC");
 $productosList = [];
 if ($productosRes) {
@@ -38,14 +46,30 @@ if ($productosRes) {
     }
 }
 
-// 3. Métricas de Producción del Proveedor
+// 4. OBTENER GRANJAS DEL PROVEEDOR
+$granjas = [];
+if ($proveedor_id > 0) {
+    $stmtG = $conn->prepare("SELECT * FROM granjas WHERE proveedor_id = ? ORDER BY id DESC");
+    $stmtG->bind_param("i", $proveedor_id);
+    $stmtG->execute();
+    $resG = $stmtG->get_result();
+    while ($row = $resG->fetch_assoc()) {
+        $granjas[] = $row;
+    }
+}
+
+// 5. MÉTRICAS Y ALERTAS AUTOMÁTICAS
 $huevosTotales = 0;
 $lotesTotales = 0;
 $lotesCaducados = 0;
 $lotesBajoStock = 0;
+$lotesProximosACaducar = 0;
+
+$fechaHoy = date('Y-m-d');
+$fechaLimite = date('Y-m-d', strtotime('+7 days'));
 
 if ($proveedor_id > 0) {
-    // Total huevos producidos
+    // Total de posturas y lotes
     $stmtMet = $conn->prepare("SELECT SUM(cantidad), COUNT(*) FROM produccion WHERE proveedor_id = ?");
     $stmtMet->bind_param("i", $proveedor_id);
     $stmtMet->execute();
@@ -61,20 +85,28 @@ if ($proveedor_id > 0) {
     $resCad = $stmtCad->get_result();
     $lotesCaducados = (int)($resCad->fetch_row()[0] ?? 0);
 
-    // Lotes bajo stock (< 100 unidades)
-    $stmtLow = $conn->prepare("SELECT COUNT(*) FROM inventario_huevos WHERE proveedor_id = ? AND estado = 'bajo_stock' OR (proveedor_id = ? AND estado = 'disponible' AND cantidad < 100)");
-    $stmtLow->bind_param("ii", $proveedor_id, $proveedor_id);
+    // Lotes con bajo stock (< 100 unidades y con cantidad > 0)
+    $stmtLow = $conn->prepare("SELECT COUNT(*) FROM inventario_huevos WHERE proveedor_id = ? AND cantidad > 0 AND (estado = 'bajo_stock' OR cantidad < 100)");
+    $stmtLow->bind_param("i", $proveedor_id);
     $stmtLow->execute();
     $resLow = $stmtLow->get_result();
     $lotesBajoStock = (int)($resLow->fetch_row()[0] ?? 0);
+
+    // Lotes próximos a caducar (en los próximos 7 días, cantidad > 0 y no caducados aún)
+    $stmtProx = $conn->prepare("SELECT COUNT(*) FROM inventario_huevos WHERE proveedor_id = ? AND cantidad > 0 AND estado != 'caducado' AND fecha_caducidad >= ? AND fecha_caducidad <= ?");
+    $stmtProx->bind_param("iss", $proveedor_id, $fechaHoy, $fechaLimite);
+    $stmtProx->execute();
+    $resProx = $stmtProx->get_result();
+    $lotesProximosACaducar = (int)($resProx->fetch_row()[0] ?? 0);
 }
 
-// 4. Obtener Granjas / Historial de Producción Reciente
+// 6. HISTORIAL DE PRODUCCIÓN RECIENTE (CON GRANJA)
 $producciones = [];
 if ($proveedor_id > 0) {
-    $prodQuery = "SELECT p.id, p.cantidad, p.fecha_produccion, p.observaciones, pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano
+    $prodQuery = "SELECT p.id, p.cantidad, p.fecha_produccion, p.observaciones, pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano, g.nombre AS granja_nombre
                   FROM produccion p
                   INNER JOIN productos pr ON p.producto_id = pr.id
+                  LEFT JOIN granjas g ON p.granja_id = g.id
                   WHERE p.proveedor_id = ?
                   ORDER BY p.id DESC LIMIT 10";
     $stmtPList = $conn->prepare($prodQuery);
@@ -86,20 +118,43 @@ if ($proveedor_id > 0) {
     }
 }
 
-// 5. Lotes Activos en Almacén
+// 7. HISTORIAL COMPLETO DE LOTES (CON GRANJA)
 $lotesAlmacen = [];
 if ($proveedor_id > 0) {
-    $lotesQuery = "SELECT i.id, i.codigo_lote, i.cantidad, i.fecha_postura, i.fecha_caducidad, i.estado, pr.nombre AS producto_nombre
+    $lotesQuery = "SELECT i.id, i.codigo_lote, i.cantidad, i.fecha_postura, i.fecha_caducidad, i.estado, pr.nombre AS producto_nombre, g.nombre AS granja_nombre
                    FROM inventario_huevos i
                    INNER JOIN productos pr ON i.producto_id = pr.id
+                   LEFT JOIN granjas g ON i.granja_id = g.id
                    WHERE i.proveedor_id = ?
-                   ORDER BY i.id DESC LIMIT 15";
+                   ORDER BY i.id DESC LIMIT 20";
     $stmtLList = $conn->prepare($lotesQuery);
     $stmtLList->bind_param("i", $proveedor_id);
     $stmtLList->execute();
     $resLList = $stmtLList->get_result();
     while ($row = $resLList->fetch_assoc()) {
         $lotesAlmacen[] = $row;
+    }
+}
+
+// 8. OBTENER INFORMACIÓN DE TRAZABILIDAD (Mapeo completo indexado para búsqueda instantánea en JS)
+$traceData = [];
+if ($proveedor_id > 0) {
+    $traceQuery = "SELECT i.codigo_lote, i.cantidad, i.fecha_postura, i.fecha_caducidad, i.estado, 
+                          pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano, 
+                          g.nombre AS granja_nombre, g.identificacion AS granja_identificacion, g.ubicacion AS granja_ubicacion
+                   FROM inventario_huevos i
+                   INNER JOIN productos pr ON i.producto_id = pr.id
+                   LEFT JOIN granjas g ON i.granja_id = g.id
+                   WHERE i.proveedor_id = ?
+                   ORDER BY i.id DESC";
+    $stmtT = $conn->prepare($traceQuery);
+    $stmtT->bind_param("i", $proveedor_id);
+    $stmtT->execute();
+    $resT = $stmtT->get_result();
+    while ($row = $resT->fetch_assoc()) {
+        $daysLeft = (strtotime($row["fecha_caducidad"]) - strtotime($fechaHoy)) / 86400;
+        $row["dias_restantes"] = max(0, (int)$daysLeft);
+        $traceData[$row["codigo_lote"]] = $row;
     }
 }
 ?>
@@ -113,26 +168,26 @@ if ($proveedor_id > 0) {
   <link rel="stylesheet" href="assets/css/globals.css">
   <link rel="stylesheet" href="assets/css/proveedor.css?v=<?php echo time(); ?>">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  
   <style>
-    /* Estilos Corporativos EcoAli Proveedores */
     :root {
-      --bg-organic: #fff5ed;
+      --bg-organic: #fff8f3;
       --primary: #ff8a00;
       --primary-hover: #e07b00;
       --secondary: #176a21;
       --secondary-light: #effeed;
-      --text-dark: #462800;
-      --text-medium: #7a5427;
-      --glass-bg: rgba(255, 255, 255, 0.85);
+      --text-dark: #3c2000;
+      --text-medium: #704d25;
+      --glass-bg: rgba(255, 255, 255, 0.92);
       --glass-border: rgba(213, 164, 112, 0.22);
-      --shadow-premium: 0 20px 45px rgba(70, 40, 0, 0.08);
-      --transition-fast: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --shadow-premium: 0 15px 35px rgba(70, 40, 0, 0.06);
+      --transition-fast: all 0.2s ease-in-out;
     }
 
     body {
-      background-color: #1a1c1a;
-      background-image: radial-gradient(circle at 10% 20%, rgba(255,138,0,0.06) 0%, transparent 40%),
-                        radial-gradient(circle at 90% 80%, rgba(157,241,151,0.08) 0%, transparent 45%);
+      background-color: #fffaf7;
+      background-image: radial-gradient(circle at 5% 5%, rgba(255,138,0,0.03) 0%, transparent 35%),
+                        radial-gradient(circle at 95% 95%, rgba(23,106,33,0.03) 0%, transparent 40%);
       color: var(--text-dark);
       font-family: 'Manrope', sans-serif;
       min-height: 100vh;
@@ -142,23 +197,21 @@ if ($proveedor_id > 0) {
     .provider-container {
       display: flex;
       min-height: 100vh;
-      position: relative;
     }
 
-    /* Sidebar */
+    /* Sidebar Premium */
     .sidebar {
       width: 280px;
       background: var(--glass-bg);
-      backdrop-filter: blur(16px);
+      backdrop-filter: blur(20px);
       border-right: 1px solid var(--glass-border);
       display: flex;
       flex-direction: column;
-      padding: 30px 24px;
+      padding: 35px 24px;
       position: fixed;
       height: 100vh;
       z-index: 10;
-      box-shadow: 10px 0 35px rgba(0,0,0,0.02);
-      transition: var(--transition-fast);
+      box-shadow: 8px 0 30px rgba(70, 40, 0, 0.02);
     }
 
     .sidebar .brand {
@@ -167,17 +220,20 @@ if ($proveedor_id > 0) {
       color: var(--secondary);
       letter-spacing: -1px;
       margin-bottom: 35px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .sidebar .profile-card {
-      background: rgba(23, 106, 33, 0.08);
+      background: rgba(23, 106, 33, 0.05);
       border-radius: 20px;
       padding: 16px;
       display: flex;
       align-items: center;
       gap: 14px;
       margin-bottom: 30px;
-      border: 1px solid rgba(23, 106, 33, 0.12);
+      border: 1px solid rgba(23, 106, 33, 0.08);
     }
 
     .sidebar .profile-card .avatar {
@@ -190,7 +246,6 @@ if ($proveedor_id > 0) {
       place-items: center;
       font-weight: 800;
       font-size: 18px;
-      box-shadow: 0 8px 16px rgba(23, 106, 33, 0.25);
     }
 
     .sidebar .profile-card .info h4 {
@@ -237,7 +292,7 @@ if ($proveedor_id > 0) {
     }
 
     .sidebar-menu button:hover {
-      background: rgba(213, 164, 112, 0.1);
+      background: rgba(213, 164, 112, 0.08);
       color: var(--text-dark);
       transform: translateX(4px);
     }
@@ -245,11 +300,7 @@ if ($proveedor_id > 0) {
     .sidebar-menu button.active {
       background: var(--secondary);
       color: white;
-      box-shadow: 0 10px 20px rgba(23, 106, 33, 0.25);
-    }
-
-    .sidebar-footer {
-      margin-top: auto;
+      box-shadow: 0 8px 20px rgba(23, 106, 33, 0.2);
     }
 
     .logout-btn {
@@ -257,7 +308,7 @@ if ($proveedor_id > 0) {
       padding: 14px;
       border-radius: 14px;
       border: 1px solid rgba(176, 37, 0, 0.15);
-      background: rgba(176, 37, 0, 0.04);
+      background: rgba(176, 37, 0, 0.03);
       color: #b02500;
       font-size: 14px;
       font-weight: 800;
@@ -272,20 +323,18 @@ if ($proveedor_id > 0) {
     .logout-btn:hover {
       background: #b02500;
       color: white;
-      box-shadow: 0 10px 20px rgba(176, 37, 0, 0.2);
+      box-shadow: 0 8px 20px rgba(176, 37, 0, 0.15);
     }
 
-    /* Main Content */
+    /* Main Content Area */
     .main-content {
       margin-left: 280px;
       flex-grow: 1;
       min-height: 100vh;
       background: var(--bg-organic);
       padding: 40px;
-      transition: var(--transition-fast);
       position: relative;
-      z-index: 1;
-      padding-bottom: 60px;
+      padding-bottom: 80px;
     }
 
     .app-header {
@@ -319,7 +368,7 @@ if ($proveedor_id > 0) {
       font-weight: 800;
       font-size: 14px;
       cursor: pointer;
-      box-shadow: 0 10px 20px rgba(255, 138, 0, 0.25);
+      box-shadow: 0 8px 20px rgba(255, 138, 0, 0.2);
       transition: var(--transition-fast);
     }
 
@@ -328,27 +377,55 @@ if ($proveedor_id > 0) {
       transform: scale(1.02);
     }
 
-    /* Tab Pane */
+    /* Tab Layouts */
     .tab-pane {
       display: none;
-      animation: fadeIn 0.4s ease-out forwards;
+      animation: fadeIn 0.3s ease-out forwards;
     }
 
     .tab-pane.active {
       display: block;
     }
 
-    /* Metrics */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Layout */
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 30px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-premium);
+      margin-bottom: 30px;
+    }
+
+    .card h3 {
+      margin: 0 0 20px;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-dark);
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 30px;
+    }
+
+    /* Metrics Grid */
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 24px;
       margin-bottom: 35px;
     }
 
     .metric-card {
       background: white;
-      border-radius: 24px;
+      border-radius: 20px;
       padding: 24px;
       border: 1px solid var(--glass-border);
       box-shadow: var(--shadow-premium);
@@ -365,174 +442,159 @@ if ($proveedor_id > 0) {
     }
 
     .metric-card .value {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 800;
       color: var(--text-dark);
       margin-top: 10px;
     }
 
-    .metric-card.warn { border-color: rgba(255, 138, 0, 0.35); background: rgba(255, 138, 0, 0.02); }
-    .metric-card.danger { border-color: rgba(176, 37, 0, 0.35); background: rgba(176, 37, 0, 0.02); }
+    .metric-card.warn { border-color: rgba(255, 138, 0, 0.3); background: rgba(255, 138, 0, 0.01); }
+    .metric-card.warn .value { color: var(--primary); }
+    .metric-card.danger { border-color: rgba(176, 37, 0, 0.3); background: rgba(176, 37, 0, 0.01); }
     .metric-card.danger .value { color: #b02500; }
 
-    /* Layouts */
-    .dashboard-layout {
+    /* Farms Tab Styling */
+    .farm-grid {
       display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 30px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 28px;
-      padding: 30px;
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--shadow-premium);
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
       margin-bottom: 30px;
     }
 
-    .card h3 {
-      margin: 0 0 20px;
-      font-size: 20px;
+    .farm-card {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      padding: 24px;
+      box-shadow: var(--shadow-premium);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: var(--transition-fast);
+    }
+
+    .farm-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(70, 40, 0, 0.08);
+    }
+
+    .farm-card .badge-id {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: var(--secondary-light);
+      color: var(--secondary);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .farm-card .farm-icon {
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+
+    .farm-card h4 {
+      margin: 0 0 8px;
+      font-size: 18px;
       font-weight: 800;
       color: var(--text-dark);
     }
 
-    /* Granjas */
-    .farm-item {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 16px 0;
-      border-bottom: 1px solid rgba(213,164,112,0.08);
+    .farm-card p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--text-medium);
+      line-height: 1.5;
     }
 
-    .farm-item:last-child {
+    .farm-card .btn-delete-farm {
+      margin-top: 20px;
       border: none;
+      background: rgba(176, 37, 0, 0.05);
+      color: #b02500;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: center;
+      transition: var(--transition-fast);
     }
 
-    .farm-icon {
-      width: 52px;
-      height: 52px;
-      background: #ffe3ca;
-      border-radius: 16px;
-      display: grid;
-      place-items: center;
-      font-size: 24px;
+    .farm-card .btn-delete-farm:hover {
+      background: #b02500;
+      color: white;
     }
 
-    .farm-details h4 {
-      margin: 0;
+    /* Stepper Traceability Timeline */
+    .stepper {
+      position: relative;
+      padding-left: 30px;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    .stepper::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 10px;
+      bottom: 10px;
+      width: 2px;
+      background: rgba(23, 106, 33, 0.15);
+    }
+
+    .step {
+      position: relative;
+    }
+
+    .step::before {
+      content: "";
+      position: absolute;
+      left: -30px;
+      top: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--secondary);
+      border: 3px solid white;
+      box-shadow: 0 0 0 4px rgba(23, 106, 33, 0.15);
+      z-index: 2;
+    }
+
+    .step.active::before {
+      background: var(--primary);
+      box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.15);
+    }
+
+    .step small {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-medium);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .step h4 {
+      margin: 4px 0 2px;
       font-size: 15px;
       font-weight: 800;
       color: var(--text-dark);
     }
 
-    .farm-details p {
-      margin: 4px 0 0;
-      font-size: 12px;
-      color: var(--text-medium);
-      font-weight: 600;
-    }
-
-    /* Lotes Table */
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-    }
-
-    .data-table th {
-      padding: 12px 16px;
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--text-medium);
-      text-transform: uppercase;
-      border-bottom: 2px solid var(--glass-border);
-    }
-
-    .data-table td {
-      padding: 14px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-dark);
-      border-bottom: 1px solid rgba(213, 164, 112, 0.08);
-    }
-
-    .badge-status {
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .badge-status.disponible { background: var(--secondary-light); color: var(--secondary); }
-    .badge-status.bajo_stock { background: rgba(255, 138, 0, 0.1); color: var(--primary); }
-    .badge-status.caducado { background: rgba(176, 37, 0, 0.1); color: #b02500; }
-
-    /* Timeline Traceability */
-    .timeline {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      position: relative;
-      padding-left: 20px;
-    }
-
-    .timeline::before {
-      content: "";
-      position: absolute;
-      left: 4px;
-      top: 8px;
-      bottom: 8px;
-      width: 2px;
-      background: var(--glass-border);
-    }
-
-    .timeline-item {
-      position: relative;
-    }
-
-    .timeline-item::before {
-      content: "";
-      position: absolute;
-      left: -20px;
-      top: 6px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--primary);
-      border: 2px solid white;
-      box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.15);
-    }
-
-    .timeline-item small {
-      font-size: 10px;
-      font-weight: 800;
-      color: var(--text-medium);
-      text-transform: uppercase;
-    }
-
-    .timeline-item h4 {
-      margin: 4px 0 2px;
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--text-dark);
-    }
-
-    .timeline-item p {
+    .step p {
       margin: 0;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-medium);
       line-height: 1.5;
     }
 
-    /* PESTAÑA: REGISTRAR PRODUCCIÓN */
+    /* Inputs y Formularios */
     .form-box {
       max-width: 680px;
       margin: 0 auto;
@@ -555,11 +617,11 @@ if ($proveedor_id > 0) {
     }
 
     .form-group label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       color: var(--text-medium);
       text-transform: uppercase;
-      margin-left: 8px;
+      margin-left: 4px;
     }
 
     .form-group input,
@@ -579,7 +641,7 @@ if ($proveedor_id > 0) {
     }
 
     .form-group textarea {
-      height: 120px;
+      height: 100px;
       padding: 16px;
       resize: none;
     }
@@ -588,7 +650,7 @@ if ($proveedor_id > 0) {
     .form-group select:focus,
     .form-group textarea:focus {
       border-color: var(--secondary);
-      box-shadow: 0 0 0 4px rgba(23, 106, 33, 0.1);
+      box-shadow: 0 0 0 4px rgba(23, 106, 33, 0.08);
     }
 
     .btn-submit {
@@ -601,31 +663,72 @@ if ($proveedor_id > 0) {
       font-size: 15px;
       font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 12px 24px rgba(23, 106, 33, 0.22);
+      box-shadow: 0 8px 20px rgba(23, 106, 33, 0.15);
       transition: var(--transition-fast);
       margin-top: 10px;
     }
 
     .btn-submit:hover {
       transform: translateY(-1px);
-      box-shadow: 0 16px 28px rgba(23, 106, 33, 0.32);
+      box-shadow: 0 12px 25px rgba(23, 106, 33, 0.25);
     }
 
-    /* Modal */
+    /* Tables */
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .data-table th {
+      padding: 14px 16px;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-medium);
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--glass-border);
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+      border-bottom: 1px solid rgba(213, 164, 112, 0.06);
+    }
+
+    .badge-status {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .badge-status.disponible { background: var(--secondary-light); color: var(--secondary); }
+    .badge-status.bajo_stock { background: rgba(255, 138, 0, 0.1); color: var(--primary); }
+    .badge-status.caducado { background: rgba(176, 37, 0, 0.1); color: #b02500; }
+
+    /* Modales */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(5px);
       z-index: 200;
       opacity: 0;
       pointer-events: none;
       display: grid;
       place-items: center;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.25s ease;
     }
 
     .modal-overlay.active {
@@ -637,9 +740,9 @@ if ($proveedor_id > 0) {
       background: white;
       border-radius: 28px;
       width: 90%;
-      max-width: 420px;
+      max-width: 440px;
       padding: 40px 30px;
-      box-shadow: 0 25px 55px rgba(0,0,0,0.15);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.15);
       border: 1px solid var(--glass-border);
       text-align: center;
     }
@@ -652,10 +755,10 @@ if ($proveedor_id > 0) {
       width: 100%;
       height: 64px;
       background: white;
-      box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.03);
       border-top: 1px solid var(--glass-border);
       z-index: 99;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       align-items: center;
     }
 
@@ -668,7 +771,7 @@ if ($proveedor_id > 0) {
       justify-content: center;
       gap: 4px;
       color: var(--text-medium);
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       cursor: pointer;
     }
@@ -712,13 +815,13 @@ if ($proveedor_id > 0) {
 
   <!-- Sidebar (Desktop) -->
   <aside class="sidebar">
-    <div class="brand">☰ ECOALI</div>
+    <div class="brand">🌱 ECOALI</div>
 
     <div class="profile-card">
-      <div class="avatar">🥚</div>
+      <div class="avatar">👨‍🌾</div>
       <div class="info">
         <h4><?php echo htmlspecialchars($nombre_empresa); ?></h4>
-        <p>Granja Proveedora</p>
+        <p>Granjero Proveedor</p>
       </div>
     </div>
 
@@ -726,21 +829,27 @@ if ($proveedor_id > 0) {
       <button class="menu-btn active" onclick="switchTab('dashboard', this)">
         <span>▦</span> <span>Dashboard</span>
       </button>
+      <button class="menu-btn" onclick="switchTab('granjas', this)">
+        <span>🚜</span> <span>Mis Granjas</span>
+      </button>
       <button class="menu-btn" onclick="switchTab('registrar', this)">
-        <span>✚</span> <span>Registrar Producción</span>
+        <span>✚</span> <span>Registrar Postura</span>
       </button>
       <button class="menu-btn" onclick="switchTab('lotes', this)">
         <span>▣</span> <span>Historial Lotes</span>
       </button>
+      <button class="menu-btn" onclick="switchTab('trazabilidad', this)">
+        <span>🔀</span> <span>Trazabilidad</span>
+      </button>
       <button class="menu-btn" onclick="switchTab('perfil', this)">
-        <span>♙</span> <span>Mi Perfil</span>
+        <span>👤</span> <span>Mi Perfil</span>
       </button>
     </nav>
 
     <div class="sidebar-footer">
       <a href="logout.php" style="text-decoration:none;">
         <button class="logout-btn">
-          <span>⤶</span> Salir
+          <span>⤶</span> Salir del Panel
         </button>
       </a>
     </div>
@@ -755,20 +864,74 @@ if ($proveedor_id > 0) {
         <p id="page-subtitle">Gestión de lotes orgánicos y trazabilidad total.</p>
       </div>
 
-      <button class="header-btn" onclick="switchTab('registrar', document.querySelectorAll('.sidebar-menu button')[1])">
-        Registrar Producción
+      <button class="header-btn" onclick="switchTab('registrar', document.querySelectorAll('.sidebar-menu button')[2])">
+        Registrar Postura
       </button>
     </header>
 
     <!-- PESTAÑA: DASHBOARD -->
     <section id="tab-dashboard" class="tab-pane active">
+      
+      <!-- Panel de Alertas Críticas (Requirement 3) -->
+      <?php
+      $lotesCriticos = [];
+      if ($proveedor_id > 0) {
+          // Lotes bajo stock
+          $stmtCritLow = $conn->prepare("SELECT codigo_lote, cantidad, pr.nombre AS producto_nombre FROM inventario_huevos i INNER JOIN productos pr ON i.producto_id = pr.id WHERE i.proveedor_id = ? AND i.cantidad > 0 AND (i.estado = 'bajo_stock' OR i.cantidad < 100) ORDER BY i.cantidad ASC LIMIT 5");
+          $stmtCritLow->bind_param("i", $proveedor_id);
+          $stmtCritLow->execute();
+          $resCritLow = $stmtCritLow->get_result();
+          while ($row = $resCritLow->fetch_assoc()) {
+              $row["motivo"] = "bajo_stock";
+              $lotesCriticos[] = $row;
+          }
+
+          // Lotes próximos a caducar
+          $stmtCritExp = $conn->prepare("SELECT codigo_lote, cantidad, fecha_caducidad, pr.nombre AS producto_nombre FROM inventario_huevos i INNER JOIN productos pr ON i.producto_id = pr.id WHERE i.proveedor_id = ? AND i.cantidad > 0 AND i.fecha_caducidad >= ? AND i.fecha_caducidad <= ? ORDER BY i.fecha_caducidad ASC LIMIT 5");
+          $stmtCritExp->bind_param("iss", $proveedor_id, $fechaHoy, $fechaLimite);
+          $stmtCritExp->execute();
+          $resCritExp = $stmtCritExp->get_result();
+          while ($row = $resCritExp->fetch_assoc()) {
+              $row["motivo"] = "cercano_caducidad";
+              $lotesCriticos[] = $row;
+          }
+      }
+      ?>
+      <?php if (!empty($lotesCriticos)): ?>
+        <div class="card" style="border-left: 5px solid var(--primary); background: rgba(255, 138, 0, 0.02); padding: 24px 28px; margin-bottom: 30px;">
+          <h3 style="margin: 0 0 15px; display: flex; align-items: center; gap: 10px; color: var(--text-dark);">
+            <span>⚠️</span> Alertas Críticas de Lotes
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <?php foreach ($lotesCriticos as $lc): ?>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: white; border-radius: 12px; border: 1px solid rgba(213, 164, 112, 0.15); box-shadow: 0 2px 8px rgba(0,0,0,0.01);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 16px;"><?php echo $lc["motivo"] === "bajo_stock" ? "📉" : "⏳"; ?></span>
+                  <div>
+                    <strong style="font-size: 14px; color: var(--text-dark);"><?php echo htmlspecialchars($lc["codigo_lote"]); ?></strong>
+                    <span style="font-size: 12px; color: var(--text-medium); margin-left: 8px;"><?php echo htmlspecialchars($lc["producto_nombre"]); ?></span>
+                  </div>
+                </div>
+                <span class="badge-status <?php echo $lc["motivo"] === "bajo_stock" ? "bajo_stock" : "caducado"; ?>" style="font-size: 11px;">
+                  <?php if ($lc["motivo"] === "bajo_stock"): ?>
+                    Bajo Stock: <?php echo $lc["cantidad"]; ?> ud
+                  <?php else: ?>
+                    Expira en: <?php echo date("d M Y", strtotime($lc["fecha_caducidad"])); ?>
+                  <?php endif; ?>
+                </span>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <div class="metrics-grid">
         <div class="metric-card">
-          <span class="label">Huevos Producidos</span>
+          <span class="label">Total Huevos Producidos</span>
           <span class="value"><?php echo number_format($huevosTotales); ?> ud</span>
         </div>
         <div class="metric-card">
-          <span class="label">Lotes Registrados</span>
+          <span class="label">Total Lotes Generados</span>
           <span class="value"><?php echo $lotesTotales; ?> lotes</span>
         </div>
         <div class="metric-card warn">
@@ -776,8 +939,8 @@ if ($proveedor_id > 0) {
           <span class="value"><?php echo $lotesBajoStock; ?> lotes</span>
         </div>
         <div class="metric-card danger">
-          <span class="label">Lotes Caducados</span>
-          <span class="value"><?php echo $lotesCaducados; ?> lotes</span>
+          <span class="label">Próximos a Caducar (≤ 7 días)</span>
+          <span class="value"><?php echo $lotesProximosACaducar; ?> lotes</span>
         </div>
       </div>
 
@@ -785,21 +948,29 @@ if ($proveedor_id > 0) {
         <!-- Granjas e Historial -->
         <div>
           <div class="card">
-            <h3>Granjas Proveedoras Vinculadas</h3>
-            <div class="farm-item">
-              <div class="farm-icon">🚜</div>
-              <div class="farm-details">
-                <h4>Granja Los Olivos</h4>
-                <p>Ubicación: <?php echo htmlspecialchars($ubicacion ?: "Vereda El Salitre"); ?> | Tel: <?php echo htmlspecialchars($telefono ?: "+34 600 000 000"); ?></p>
+            <h3>Tus Granjas Activas</h3>
+            <?php if (!empty($granjas)): ?>
+              <div style="display: flex; flex-direction: column; gap: 14px;">
+                <?php foreach (array_slice($granjas, 0, 3) as $g): ?>
+                  <div class="farm-item" style="padding: 10px 0;">
+                    <div class="farm-icon">🚜</div>
+                    <div class="farm-details">
+                      <h4><?php echo htmlspecialchars($g["nombre"]); ?></h4>
+                      <p>Código: <strong><?php echo htmlspecialchars($g["identificacion"]); ?></strong> | Ubicación: <?php echo htmlspecialchars($g["ubicacion"]); ?></p>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
               </div>
-            </div>
-            <div class="farm-item">
-              <div class="farm-icon">🏡</div>
-              <div class="farm-details">
-                <h4>Hacienda El Rocío</h4>
-                <p>Ubicación: Valle de Atuntaqui | Operación Principal</p>
+              <?php if (count($granjas) > 3): ?>
+                <p style="margin: 15px 0 0; font-size: 13px;"><a href="#" onclick="switchTab('granjas', document.querySelectorAll('.sidebar-menu button')[1])" style="color:var(--secondary); font-weight:800; text-decoration:none;">Ver las <?php echo count($granjas); ?> granjas ➔</a></p>
+              <?php endif; ?>
+            <?php else: ?>
+              <div style="text-align: center; padding: 25px; color: var(--text-medium); border: 1px dashed var(--glass-border); border-radius: 16px;">
+                <span style="font-size: 24px; display:block; margin-bottom: 8px;">🚜</span>
+                No tienes granjas registradas.<br>
+                <a href="#" onclick="switchTab('granjas', document.querySelectorAll('.sidebar-menu button')[1])" style="color: var(--secondary); font-weight: 800; text-decoration:none; margin-top:10px; display:inline-block;">¡Registra tu primera granja aquí!</a>
               </div>
-            </div>
+            <?php endif; ?>
           </div>
 
           <div class="card">
@@ -810,7 +981,7 @@ if ($proveedor_id > 0) {
                   <tr>
                     <th>Fecha</th>
                     <th>Producto</th>
-                    <th>Tamaño</th>
+                    <th>Granja Origen</th>
                     <th>Cantidad</th>
                   </tr>
                 </thead>
@@ -820,8 +991,8 @@ if ($proveedor_id > 0) {
                       <tr>
                         <td><?php echo date("d M Y", strtotime($prod["fecha_produccion"])); ?></td>
                         <td><?php echo htmlspecialchars($prod["producto_nombre"]); ?></td>
-                        <td><?php echo htmlspecialchars($prod["tamano"]); ?></td>
-                        <td><strong style="color:var(--secondary);"><?php echo number_format($prod["cantidad"]); ?> ud</strong></td>
+                        <td><small>🚜</small> <strong><?php echo htmlspecialchars($prod["granja_nombre"] ?? "General"); ?></strong></td>
+                        <td><strong style="color:var(--secondary);"><?php echo number_format($prod["amount"] ?? $prod["cantidad"]); ?> ud</strong></td>
                       </tr>
                     <?php endforeach; ?>
                   <?php else: ?>
@@ -837,18 +1008,19 @@ if ($proveedor_id > 0) {
           </div>
         </div>
 
-        <!-- Timeline Traceability -->
+        <!-- Trazabilidad rápida en Timeline -->
         <div>
           <div class="card">
-            <h3>🔀 Trazabilidad y Eventos</h3>
+            <h3>🔀 Línea de Tiempo de Lotes</h3>
             <div class="timeline">
               <?php if (!empty($lotesAlmacen)): ?>
                 <?php foreach (array_slice($lotesAlmacen, 0, 4) as $l): ?>
                   <div class="timeline-item">
                     <small><?php echo date("d M Y", strtotime($l["fecha_postura"])); ?></small>
-                    <h4>Ingreso Lote <?php echo htmlspecialchars($l["codigo_lote"]); ?></h4>
+                    <h4>Lote <?php echo htmlspecialchars($l["codigo_lote"]); ?></h4>
                     <p>
-                      Se clasificaron e ingresaron **<?php echo number_format($l["cantidad"]); ?> ud** de **<?php echo htmlspecialchars($l["producto_nombre"]); ?>** al almacén de distribución.
+                      <strong><?php echo number_format($l["cantidad"]); ?> ud</strong> de <?php echo htmlspecialchars($l["producto_nombre"]); ?><br>
+                      Procedencia: 🚜 <strong><?php echo htmlspecialchars($l["granja_nombre"] ?? "General"); ?></strong>
                     </p>
                   </div>
                 <?php endforeach; ?>
@@ -865,44 +1037,129 @@ if ($proveedor_id > 0) {
       </div>
     </section>
 
-    <!-- PESTAÑA: REGISTRAR PRODUCCIÓN -->
+    <!-- PESTAÑA: MIS GRANJAS (Requirement 1) -->
+    <section id="tab-granjas" class="tab-pane">
+      <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:30px; align-items: start;">
+        
+        <!-- Formulario para Registrar Granja -->
+        <div class="card">
+          <h3>Registrar Nueva Granja</h3>
+          <p style="font-size: 13px; color: var(--text-medium); line-height: 1.5; margin: -10px 0 24px;">
+            Da de alta una instalación avícola para asociar tus lotes cosechados y asegurar la trazabilidad.
+          </p>
+
+          <form id="farm-form" onsubmit="submitFarm(event)">
+            <div style="display: flex; flex-direction: column; gap:16px;">
+              <div class="form-group">
+                <label>Nombre de la Granja</label>
+                <input type="text" id="farm-nombre" placeholder="Ej: Granja Santa Ana" required>
+              </div>
+
+              <div class="form-group">
+                <label>Identificación de Granja / Código de Registro</label>
+                <input type="text" id="farm-identificacion" placeholder="Ej: ES-AN-41001" required>
+              </div>
+
+              <div class="form-group">
+                <label>Ubicación Geográfica Completa</label>
+                <input type="text" id="farm-ubicacion" placeholder="Ej: Sevilla, España" required>
+              </div>
+
+              <button type="submit" class="btn-submit" style="margin-top:10px;">Registrar Granja</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Listado de Granjas -->
+        <div class="card" style="margin-bottom:0;">
+          <h3>Granjas Registradas</h3>
+          <div id="farms-list-container" class="farm-grid">
+            <!-- Cargado vía AJAX/PHP -->
+            <?php if (!empty($granjas)): ?>
+              <?php foreach ($granjas as $g): ?>
+                <div class="farm-card">
+                  <span class="badge-id"><?php echo htmlspecialchars($g["identificacion"]); ?></span>
+                  <div class="farm-icon">🚜</div>
+                  <h4><?php echo htmlspecialchars($g["nombre"]); ?></h4>
+                  <p>📍 <strong>Ubicación:</strong> <?php echo htmlspecialchars($g["ubicacion"]); ?></p>
+                  <p>📅 <strong>Registrado:</strong> <?php echo date("d M Y", strtotime($g["creado_en"])); ?></p>
+                  <button class="btn-delete-farm" onclick="deleteFarm(<?php echo $g['id']; ?>)">Eliminar Granja</button>
+                </div>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-medium); border: 1px dashed var(--glass-border); border-radius: 16px;">
+                <span style="font-size: 32px; display:block; margin-bottom: 12px;">🚜</span>
+                No has registrado ninguna granja aún.
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PESTAÑA: REGISTRAR PRODUCCIÓN (Requirement 2) -->
     <section id="tab-registrar" class="tab-pane">
       <div class="card form-box">
-        <h3>Registrar Nueva Producción Diaria</h3>
+        <h3>Registrar Nueva Postura y Lote</h3>
         <p style="font-size: 13px; color: var(--text-medium); line-height: 1.5; margin: -10px 0 24px;">
-          Ingresa la postura recolectada del día. Esto generará un lote automático y actualizará el stock disponible para ventas en tiempo real en la tienda del cliente.
+          Ingresa la postura recolectada del día. **Es obligatorio vincular una granja de origen** para garantizar la trazabilidad de los huevos. El lote se generará inmediatamente y estará disponible en el catálogo de clientes.
         </p>
 
-        <form id="production-form" onsubmit="submitProduction(event)">
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Tipo de Huevo Producido</label>
-              <select id="prod-producto-id" required>
-                <option value="">Selecciona tipo de huevo</option>
-                <?php foreach ($productosList as $pr): ?>
-                  <option value="<?php echo $pr['id']; ?>"><?php echo htmlspecialchars($pr['nombre'] . " [" . $pr['tamano'] . "]"); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+        <?php if (!empty($granjas)): ?>
+          <form id="production-form" onsubmit="submitProduction(event)">
+            <div class="form-grid">
+              
+              <div class="form-group">
+                <label>Granja de Origen</label>
+                <select id="prod-granja-id" required>
+                  <option value="">-- Selecciona la Granja de Origen --</option>
+                  <?php foreach ($granjas as $g): ?>
+                    <option value="<?php echo $g['id']; ?>">🚜 <?php echo htmlspecialchars($g['nombre'] . ' [' . $g['identificacion'] . ']'); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
 
-            <div class="form-group">
-              <label>Cantidad Recolectada (Unidades)</label>
-              <input type="number" id="prod-cantidad" placeholder="Ej: 1500" min="1" required>
-            </div>
+              <div class="form-group">
+                <label>Tipo de Huevo Producido</label>
+                <select id="prod-producto-id" required>
+                  <option value="">Selecciona tipo de huevo</option>
+                  <?php foreach ($productosList as $pr): ?>
+                    <option value="<?php echo $pr['id']; ?>"><?php echo htmlspecialchars($pr['nombre'] . " [" . $pr['tamano'] . "]"); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
 
-            <div class="form-group">
-              <label>Fecha de Recolección / Postura</label>
-              <input type="date" id="prod-fecha" value="<?php echo date('Y-m-d'); ?>" required>
-            </div>
+              <div class="form-group">
+                <label>Cantidad Recolectada (Unidades)</label>
+                <input type="number" id="prod-cantidad" placeholder="Ej: 1500" min="1" required>
+              </div>
 
-            <div class="form-group">
-              <label>Observaciones de Trazabilidad</label>
-              <input type="text" id="prod-obs" placeholder="Ej: Excelente color, cáscara firme. Granja 1.">
-            </div>
+              <div class="form-group">
+                <label>Fecha de Postura</label>
+                <input type="date" id="prod-fecha" value="<?php echo date('Y-m-d'); ?>" required>
+              </div>
 
-            <button type="submit" class="btn-submit">Registrar Postura y Generar Lote</button>
+              <div class="form-group full-width">
+                <label>Observaciones de Trazabilidad</label>
+                <textarea id="prod-obs" placeholder="Ej: Huevos de excelente frescura, alimentación 100% ecológica en corral libre."></textarea>
+              </div>
+
+              <button type="submit" class="btn-submit">Registrar Postura y Generar Lote</button>
+            </div>
+          </form>
+        <?php else: ?>
+          <div style="text-align: center; padding: 40px; border: 1px dashed var(--glass-border); border-radius: 20px; background: rgba(255,138,0,0.01);">
+            <span style="font-size: 40px; display:block; margin-bottom:15px;">🚜</span>
+            <h4 style="margin: 0 0 10px; font-size:18px; color:var(--text-dark);">¡Falta Registrar Granjas!</h4>
+            <p style="margin: 0 0 20px; font-size:14px; color:var(--text-medium); line-height:1.6;">
+              Por políticas de trazabilidad del sistema EcoAli, es obligatorio que registres al menos una granja antes de poder dar de alta lotes de huevo en la plataforma.
+            </p>
+            <button onclick="switchTab('granjas', document.querySelectorAll('.sidebar-menu button')[1])" style="background:var(--secondary); color:white; border:none; padding:12px 30px; border-radius:12px; font-weight:800; cursor:pointer;">
+              Registrar Granja Ahora
+            </button>
           </div>
-        </form>
+        <?php endif; ?>
       </div>
     </section>
 
@@ -920,10 +1177,12 @@ if ($proveedor_id > 0) {
               <tr>
                 <th>Código Lote</th>
                 <th>Producto</th>
+                <th>Granja Origen</th>
                 <th>Cantidad Stock</th>
                 <th>Fecha Postura</th>
                 <th>Fecha Caducidad</th>
                 <th>Estado Lote</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -934,15 +1193,21 @@ if ($proveedor_id > 0) {
                   <tr>
                     <td><strong style="color:var(--text-dark);"><?php echo htmlspecialchars($l["codigo_lote"]); ?></strong></td>
                     <td><?php echo htmlspecialchars($l["producto_nombre"]); ?></td>
+                    <td>🚜 <strong><?php echo htmlspecialchars($l["granja_nombre"] ?? "General"); ?></strong></td>
                     <td><strong><?php echo number_format($l["cantidad"]); ?> ud</strong></td>
                     <td><?php echo date("d M Y", strtotime($l["fecha_postura"])); ?></td>
                     <td><?php echo date("d M Y", strtotime($l["fecha_caducidad"])); ?></td>
                     <td><span class="badge-status <?php echo $estClass; ?>"><?php echo $l["estado"]; ?></span></td>
+                    <td>
+                      <button onclick="openTrazabilidadDirecta('<?php echo htmlspecialchars($l['codigo_lote']); ?>')" style="background:var(--secondary); color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">
+                        Rastrear 🔀
+                      </button>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
               <?php else: ?>
                 <tr>
-                  <td colspan="6" style="text-align:center; color:var(--text-medium); padding:30px;">
+                  <td colspan="8" style="text-align:center; color:var(--text-medium); padding:30px;">
                     No hay lotes ingresados al inventario de EcoAli.
                   </td>
                 </tr>
@@ -950,6 +1215,71 @@ if ($proveedor_id > 0) {
             </tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA: TRAZABILIDAD INTERACTIVA (Requirement 4) -->
+    <section id="tab-trazabilidad" class="tab-pane">
+      <div class="card" style="max-width:750px; margin: 0 auto;">
+        <h3>🔀 Centro de Trazabilidad e Historial</h3>
+        <p style="font-size: 13px; color: var(--text-medium); line-height: 1.5; margin: -10px 0 24px;">
+          Rastrea de forma transparente cualquier lote de huevo producido. Selecciona un código de lote abajo para ver su cadena de custodia completa en tiempo real.
+        </p>
+
+        <div class="form-group" style="margin-bottom:30px;">
+          <label>Código de Lote a Rastrear</label>
+          <select id="trace-lote-select" onchange="loadTraceability(this.value)" style="height:56px; font-size:16px;">
+            <option value="">-- Selecciona un Lote de la Lista --</option>
+            <?php foreach ($lotesAlmacen as $l): ?>
+              <option value="<?php echo htmlspecialchars($l['codigo_lote']); ?>">🥚 <?php echo htmlspecialchars($l['codigo_lote'] . ' (' . $l['producto_nombre'] . ')'); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <!-- Timeline dynamically generated -->
+        <div id="trace-result-container" style="display:none; border-top: 1px solid var(--glass-border); padding-top:30px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px;">
+            <div>
+              <h4 style="margin:0; font-size:18px; color:var(--text-dark);" id="trace-lote-code">LOTE-1234</h4>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--text-medium);" id="trace-lote-product">Tipo de Huevo: Eco-Organic</p>
+            </div>
+            <span class="badge-status disponible" id="trace-lote-status">Disponible</span>
+          </div>
+
+          <div class="stepper">
+            
+            <div class="step">
+              <small>Fase 1: Postura y Cosecha</small>
+              <h4 id="trace-step-farm">Granja de Origen</h4>
+              <p id="trace-step-farm-desc">Detalles de la cosecha y fecha de recolección.</p>
+            </div>
+
+            <div class="step">
+              <small>Fase 2: Clasificación y Calidad</small>
+              <h4>Control de Trazabilidad</h4>
+              <p id="trace-step-quality-desc">Clasificado por tamaño y tipo bajo estándares orgánicos de EcoAli.</p>
+            </div>
+
+            <div class="step">
+              <small>Fase 3: Almacén e Inventario</small>
+              <h4>Ingreso al Almacén EcoAli</h4>
+              <p id="trace-step-stock-desc">Ingresado al stock listo para la venta y con fecha de expiración.</p>
+            </div>
+
+            <div class="step" id="trace-step-distribution-block">
+              <small>Fase 4: Distribución al Cliente</small>
+              <h4>Entrega y Venta Final</h4>
+              <p id="trace-step-distribution-desc">Pendiente de compra por clientes de la plataforma.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <div id="trace-empty-message" style="text-align: center; padding: 40px 20px; color: var(--text-medium);">
+          <span style="font-size: 40px; display:block; margin-bottom:12px;">🔍</span>
+          Selecciona un código de lote del menú desplegable para generar el rastreo completo.
+        </div>
+
       </div>
     </section>
 
@@ -991,11 +1321,15 @@ if ($proveedor_id > 0) {
 
   </main>
 
-  <!-- Mobile Nav -->
+  <!-- Mobile Nav Footer -->
   <nav class="mobile-nav">
     <button class="mobile-nav-btn active" onclick="switchTab('dashboard', this)">
       <span>▦</span>
       <span>Dashboard</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="switchTab('granjas', this)">
+      <span>🚜</span>
+      <span>Granjas</span>
     </button>
     <button class="mobile-nav-btn" onclick="switchTab('registrar', this)">
       <span>✚</span>
@@ -1006,20 +1340,20 @@ if ($proveedor_id > 0) {
       <span>Lotes</span>
     </button>
     <button class="mobile-nav-btn" onclick="switchTab('perfil', this)">
-      <span>♙</span>
+      <span>👤</span>
       <span>Perfil</span>
     </button>
   </nav>
 
 </div>
 
-<!-- Modal: Éxito -->
+<!-- Modal Universal: Éxito / Error -->
 <div class="modal-overlay" id="alert-modal">
   <div class="modal-container">
     <div style="font-size: 60px; color: var(--secondary); margin-bottom: 20px;" id="alert-icon">✓</div>
-    <h3 style="margin: 0 0 10px; font-size: 22px; font-weight: 800;" id="alert-title">¡Lote Creado!</h3>
+    <h3 style="margin: 0 0 10px; font-size: 22px; font-weight: 800;" id="alert-title">¡Éxito!</h3>
     <p style="margin: 0 0 25px; font-size: 14px; color: var(--text-medium); line-height: 1.6;" id="alert-message">
-      Lote registrado y disponible para la venta.
+      Operación completada con éxito.
     </p>
     <button onclick="closeAlertModal()" style="background: var(--text-dark); color: white; border: none; padding: 12px 30px; border-radius: 12px; font-weight: 800; cursor: pointer;">
       Entendido
@@ -1028,21 +1362,32 @@ if ($proveedor_id > 0) {
 </div>
 
 <script>
+  // Inyección de datos de lotes y trazabilidad
+  var ecoaliLotesTrace = <?php echo json_encode($traceData); ?>;
+
   function switchTab(tabName, element) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + tabName).classList.add('active');
+      
+      const targetPane = document.getElementById('tab-' + tabName);
+      if (targetPane) {
+          targetPane.classList.add('active');
+      }
 
       document.querySelectorAll('.sidebar-menu button, .mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Activar el botón correspondiente en sidebar y nav móvil
       document.querySelectorAll('.sidebar-menu button, .mobile-nav-btn').forEach(btn => {
-          if (btn.outerHTML.includes(tabName)) {
+          if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabName)) {
               btn.classList.add('active');
           }
       });
 
       const titles = {
           'dashboard': { title: 'Panel de Control', subtitle: 'Gestión de lotes orgánicos y trazabilidad total.' },
+          'granjas': { title: 'Mis Granjas', subtitle: 'Administra tus instalaciones y locales avícolas.' },
           'registrar': { title: 'Registrar Postura', subtitle: 'Ingresa la recolección del día para generar un lote.' },
           'lotes': { title: 'Lotes en Almacén', subtitle: 'Trazabilidad y control de stock avícola.' },
+          'trazabilidad': { title: 'Trazabilidad de Lotes', subtitle: 'Rastreo y cadena de custodia del producto.' },
           'perfil': { title: 'Perfil de Proveedor', subtitle: 'Configura los datos de tu empresa avícola.' }
       };
 
@@ -1052,16 +1397,83 @@ if ($proveedor_id > 0) {
       }
   }
 
-  // Enviar Producción (AJAX)
+  // Registrar Granja (AJAX)
+  function submitFarm(e) {
+      e.preventDefault();
+
+      const nom = document.getElementById('farm-nombre').value;
+      const ide = document.getElementById('farm-identificacion').value;
+      const ubi = document.getElementById('farm-ubicacion').value;
+
+      const payload = {
+          accion: 'registrar',
+          nombre: nom,
+          identificacion: ide,
+          ubicacion: ubi
+      };
+
+      fetch('forms/granjas_acciones.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.status === 'success') {
+              showAlertModal(
+                  '¡Granja Registrada!',
+                  data.message,
+                  '✓',
+                  'var(--secondary)',
+                  true
+              );
+          } else {
+              showAlertModal('Error', data.message, '✗', '#b02500');
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          showAlertModal('Error de Servidor', 'Ocurrió un error inesperado al registrar la granja.', '✗', '#b02500');
+      });
+  }
+
+  // Eliminar Granja (AJAX)
+  function deleteFarm(id) {
+      if (!confirm('¿Estás seguro de que deseas eliminar esta granja? Todos los lotes vinculados se mantendrán pero perderán la referencia de origen.')) {
+          return;
+      }
+
+      fetch('forms/granjas_acciones.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'eliminar', id: id })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.status === 'success') {
+              showAlertModal('Granja Eliminada', data.message, '✓', 'var(--secondary)', true);
+          } else {
+              showAlertModal('Error', data.message, '✗', '#b02500');
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          showAlertModal('Error', 'No se pudo eliminar la granja.', '✗', '#b02500');
+      });
+  }
+
+  // Enviar Postura (AJAX)
   function submitProduction(e) {
       e.preventDefault();
 
+      const granjaId = document.getElementById('prod-granja-id').value;
       const prodId = document.getElementById('prod-producto-id').value;
       const cant = document.getElementById('prod-cantidad').value;
       const fec = document.getElementById('prod-fecha').value;
       const obs = document.getElementById('prod-obs').value;
 
       const payload = {
+          granja_id: granjaId,
           producto_id: prodId,
           cantidad: cant,
           fecha_produccion: fec,
@@ -1091,6 +1503,74 @@ if ($proveedor_id > 0) {
           console.error(err);
           showAlertModal('Error de Servidor', 'Ocurrió un error inesperado al procesar.', '✗', '#b02500');
       });
+  }
+
+  // Cargar Trazabilidad Interactiva en Stepper (Instantáneo sin lag)
+  function loadTraceability(loteCode) {
+      const resultContainer = document.getElementById('trace-result-container');
+      const emptyMessage = document.getElementById('trace-empty-message');
+
+      if (!loteCode || !ecoaliLotesTrace[loteCode]) {
+          resultContainer.style.display = 'none';
+          emptyMessage.style.display = 'block';
+          return;
+      }
+
+      const lote = ecoaliLotesTrace[loteCode];
+      emptyMessage.style.display = 'none';
+      resultContainer.style.display = 'block';
+
+      // 1. Encabezado
+      document.getElementById('trace-lote-code').textContent = lote.codigo_lote;
+      document.getElementById('trace-lote-product').textContent = `Producto: ${lote.producto_nombre} (${lote.tipo_huevo} - ${lote.tamano})`;
+      
+      const statusEl = document.getElementById('trace-lote-status');
+      statusEl.className = `badge-status ${lote.estado}`;
+      statusEl.textContent = lote.estado.replace('_', ' ');
+
+      // 2. Paso 1: Granja
+      const farmName = lote.granja_nombre || "General/No especificado";
+      document.getElementById('trace-step-farm').textContent = `Origen: 🚜 ${farmName}`;
+      document.getElementById('trace-step-farm-desc').textContent = `Recolección e identificación física en la granja con código ${lote.granja_identificacion || 'N/A'}, ubicada en ${lote.granja_ubicacion || 'General'}.`;
+
+      // 3. Paso 2: Postura y Calidad
+      document.getElementById('trace-step-quality-desc').textContent = `Huevo orgánico cosechado el día ${formatDateString(lote.fecha_postura)} bajo rigurosas pautas de alimentación y cría libre.`;
+
+      // 4. Paso 3: Stock
+      let stockMsg = `Ingreso exitoso al almacén distribuidor de EcoAli. Cantidad en lote: **${lote.cantidad} unidades**. `;
+      if (lote.estado === 'caducado') {
+          stockMsg += `⚠️ **LOTE CADUCADO**. Expiró el día ${formatDateString(lote.fecha_caducidad)}.`;
+      } else {
+          stockMsg += `Expira en ${lote.dias_restantes} días (${formatDateString(lote.fecha_caducidad)}).`;
+      }
+      document.getElementById('trace-step-stock-desc').innerHTML = stockMsg;
+
+      // 5. Paso 4: Distribución
+      const distBlock = document.getElementById('trace-step-distribution-block');
+      const distDesc = document.getElementById('trace-step-distribution-desc');
+
+      if (lote.cantidad === 0 || lote.estado === 'vendido') {
+          distBlock.className = "step active";
+          distDesc.textContent = `Lote completamente distribuido y vendido a consumidores finales a través de la tienda EcoAli. ¡Ciclo de frescura completado!`;
+      } else {
+          distBlock.className = "step";
+          distDesc.textContent = `Lote disponible y visible en el catálogo de clientes. Pendiente de asignación logística de venta.`;
+      }
+  }
+
+  // Ir directamente a Trazabilidad de Lote
+  function openTrazabilidadDirecta(loteCode) {
+      switchTab('trazabilidad', document.querySelectorAll('.sidebar-menu button')[4]);
+      document.getElementById('trace-lote-select').value = loteCode;
+      loadTraceability(loteCode);
+  }
+
+  function formatDateString(dateStr) {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const date = new Date(parts[0], parts[1] - 1, parts[2]);
+      return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   // Guardar Perfil de Proveedor (AJAX)

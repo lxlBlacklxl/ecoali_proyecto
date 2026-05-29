@@ -53,7 +53,50 @@ $conn->query("CREATE TABLE IF NOT EXISTS `regalias` (
 // 7. COMPATIBILIDAD LOGÍSTICA: MODIFICAR ENUM DE ESTADOS DE PEDIDO
 $conn->query("ALTER TABLE pedidos MODIFY COLUMN estado ENUM('pendiente','preparado','en_ruta','entregado','cancelado') DEFAULT 'pendiente'");
 
-// 8. FUNCIÓN AUXILIAR DE REGISTRO EN BITÁCORA (AUDITORÍA INTERNA)
+// 8. MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE GRANJAS SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `granjas` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `proveedor_id` INT NOT NULL,
+    `nombre` VARCHAR(150) NOT NULL,
+    `identificacion` VARCHAR(100) NOT NULL,
+    `ubicacion` VARCHAR(200) NOT NULL,
+    `creado_en` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`proveedor_id`) REFERENCES `proveedores`(`id`) ON DELETE CASCADE
+)");
+
+// 9. MIGRACIÓN AUTOMÁTICA: AGREGAR granja_id A produccion E inventario_huevos SI NO EXISTEN
+$resColProd = $conn->query("SHOW COLUMNS FROM `produccion` LIKE 'granja_id'");
+if ($resColProd && $resColProd->num_rows === 0) {
+    $conn->query("ALTER TABLE `produccion` ADD COLUMN `granja_id` INT NULL, ADD FOREIGN KEY (`granja_id`) REFERENCES `granjas`(`id`) ON DELETE SET NULL");
+}
+
+$resColInv = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'granja_id'");
+if ($resColInv && $resColInv->num_rows === 0) {
+    $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `granja_id` INT NULL, ADD FOREIGN KEY (`granja_id`) REFERENCES `granjas`(`id`) ON DELETE SET NULL");
+}
+
+// 9.2 COMPATIBILIDAD LOGÍSTICA: AGREGAR COLUMNAS DE ENTREGA A PEDIDOS SI NO EXISTEN
+$resFechaEntrega = $conn->query("SHOW COLUMNS FROM `pedidos` LIKE 'fecha_entrega'");
+if ($resFechaEntrega && $resFechaEntrega->num_rows === 0) {
+    $conn->query("ALTER TABLE `pedidos` 
+                  ADD COLUMN `fecha_entrega` DATETIME NULL,
+                  ADD COLUMN `coordenadas_entrega` VARCHAR(100) NULL,
+                  ADD COLUMN `firma_entrega` LONGTEXT NULL,
+                  ADD COLUMN `foto_entrega` LONGTEXT NULL");
+}
+
+// 9.3 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE INCIDENCIAS SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `incidencias` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `pedido_id` INT NOT NULL,
+    `repartidor_id` INT NOT NULL,
+    `tipo` VARCHAR(50) NOT NULL,
+    `descripcion` TEXT NOT NULL,
+    `coordenadas` VARCHAR(100) NULL,
+    `fecha_reporte` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+
+// 10. FUNCIÓN AUXILIAR DE REGISTRO EN BITÁCORA (AUDITORÍA INTERNA)
 if (!function_exists('registrar_bitacora')) {
     /**
      * Registra una acción relevante realizada en el sistema para fines de auditoría.
