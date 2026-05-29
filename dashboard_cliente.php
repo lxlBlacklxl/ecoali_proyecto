@@ -1317,6 +1317,12 @@ if (!empty($pedidos)) {
       if (open) {
           drawer.classList.add('active');
           overlay.classList.add('active');
+          
+          // Ocultar/quitar el número de notificaciones al abrir
+          const counter = document.getElementById('notif-counter');
+          if (counter) {
+              counter.style.display = 'none';
+          }
       } else {
           drawer.classList.remove('active');
           overlay.classList.remove('active');
