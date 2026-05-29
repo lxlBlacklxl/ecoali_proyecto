@@ -296,6 +296,29 @@ if (!empty($pedidos)) {
       letter-spacing: 0.5px;
     }
 
+    .order-filter-tag {
+      background: white;
+      border: 1px solid var(--glass-border);
+      color: var(--text-medium);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: var(--transition-fast);
+    }
+    .order-filter-tag:hover {
+      background: rgba(255, 138, 0, 0.02);
+      border-color: var(--primary);
+    }
+    .order-filter-tag.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      box-shadow: 0 8px 16px rgba(255, 138, 0, 0.2);
+    }
+
     .sidebar-menu {
       display: flex;
       flex-direction: column;
@@ -558,6 +581,42 @@ if (!empty($pedidos)) {
       box-shadow: 0 20px 50px rgba(0,0,0,0.15);
       border: 1px solid var(--glass-border);
     }
+
+    /* Tab pane styling */
+    .tab-pane {
+      display: none !important;
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    .tab-pane.active {
+      display: block !important;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cart drawer & overlay active states */
+    .cart-drawer.active {
+      right: 0 !important;
+    }
+    .cart-drawer-overlay.active {
+      opacity: 1 !important;
+      pointer-events: all !important;
+    }
+
+    /* Notification drawer active states */
+    .notification-drawer.active {
+      right: 0 !important;
+    }
+    .notification-drawer-overlay.active {
+      opacity: 1 !important;
+      pointer-events: all !important;
+    }
+
+    /* Order details pane active state */
+    .order-details-pane.active {
+      display: block !important;
+    }
   </style>
 </head>
 <body>
@@ -699,12 +758,32 @@ if (!empty($pedidos)) {
 
     <!-- PESTAÑA: MIS PEDIDOS -->
     <section id="tab-pedidos" class="tab-pane">
+      <div class="order-search-filters" style="display:grid; grid-template-columns: 1fr auto; gap:20px; margin-bottom:30px;">
+        <div style="position:relative; background:white; border-radius:20px; box-shadow:var(--shadow-premium); border:1px solid var(--glass-border); display:flex; align-items:center; padding:0 20px; flex-grow:1;">
+          <span style="font-size:20px; margin-right:10px; color:var(--primary);">⌕</span>
+          <input type="text" id="orders-search" placeholder="Buscar por ID, total, método de pago, fecha o estado..." onkeyup="filterOrders()" style="border:none; outline:none; width:100%; height:56px; font-size:14px; font-weight:600; color:var(--text-dark); background:transparent;">
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="order-filter-tag active" onclick="filterOrderStatus('todos', this)">Todos</button>
+          <button class="order-filter-tag" onclick="filterOrderStatus('pendiente', this)">Pendientes</button>
+          <button class="order-filter-tag" onclick="filterOrderStatus('cancelado', this)">Cancelados</button>
+          <button class="order-filter-tag" onclick="filterOrderStatus('entregado', this)">Entregados</button>
+        </div>
+      </div>
+
       <div class="orders-container" style="display:flex; flex-direction:column; gap:20px;">
         <?php if (!empty($pedidos)): ?>
           <?php foreach ($pedidos as $ped): 
             $estado = strtolower($ped["estado"]);
           ?>
-            <article class="order-card" id="order-card-<?php echo $ped['id']; ?>" style="background:white; border-radius:24px; border:1px solid var(--glass-border); box-shadow:var(--shadow-premium); overflow:hidden;">
+            <article class="order-card" id="order-card-<?php echo $ped['id']; ?>" 
+                     data-id="#ped-<?php echo str_pad($ped["id"], 3, "0", STR_PAD_LEFT); ?>"
+                     data-total="<?php echo number_format($ped["total"], 2); ?>"
+                     data-pago="<?php echo strtolower($ped["metodo_pago"] ?? "efectivo"); ?>"
+                     data-estado="<?php echo $estado; ?>"
+                     data-fecha="<?php echo strtolower(date("d M Y, h:i A", strtotime($ped["fecha_pedido"]))); ?>"
+                     style="background:white; border-radius:24px; border:1px solid var(--glass-border); box-shadow:var(--shadow-premium); overflow:hidden;">
               <div class="order-card-header" style="padding:24px; background:rgba(213, 164, 112, 0.03); border-bottom:1px solid var(--glass-border); display:grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; align-items:center; gap:15px;">
                 <div>
                   <h4 style="margin:0; font-size:12px; color:var(--text-medium); text-transform:uppercase;">ID Pedido</h4>
@@ -1098,6 +1177,21 @@ if (!empty($pedidos)) {
   </div>
 </div>
 
+<!-- Modal de Confirmación de Cancelación Premium -->
+<div class="modal-overlay" id="confirm-cancel-modal">
+  <div class="modal-container" style="max-width:400px; text-align:center; padding:40px 30px;">
+    <div style="font-size:60px; color:#b02500; margin-bottom:20px;">⚠</div>
+    <h3 style="margin:0 0 10px; font-size:22px; font-weight:800; color:#b02500;">¿Cancelar Pedido?</h3>
+    <p style="margin:0 0 25px; font-size:14px; color:var(--text-medium); line-height:1.6;">
+      ¿Estás seguro de que deseas cancelar este pedido? Se liberará el stock de inmediato y se procesará la devolución.
+    </p>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button onclick="closeConfirmCancelModal()" style="background:rgba(70,40,0,0.06); color:#7a5427; border:none; padding:12px 24px; border-radius:12px; font-weight:800; cursor:pointer; font-family:inherit;">Atrás</button>
+      <button onclick="executeCancelOrder()" style="background:#b02500; color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:800; cursor:pointer; font-family:inherit; box-shadow:0 8px 20px rgba(176,37,0,0.15);">Sí, Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // Inyección de Notificaciones desde la base de datos
   var ecoaliNotifications = <?php echo json_encode($notificaciones); ?>;
@@ -1153,6 +1247,67 @@ if (!empty($pedidos)) {
           const tipo = card.dataset.tipo;
           card.style.display = (tag === 'todos' || tipo.includes(tag)) ? 'flex' : 'none';
       });
+  }
+
+  // Filtrado y Búsqueda en tiempo real de Pedidos
+  let activeOrderStatusFilter = 'todos';
+
+  function filterOrderStatus(status, btn) {
+      document.querySelectorAll('.order-filter-tag').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      activeOrderStatusFilter = status;
+      filterOrders();
+  }
+
+  function filterOrders() {
+      const query = document.getElementById('orders-search').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.order-card');
+      let visibleCount = 0;
+
+      cards.forEach(card => {
+          const id = card.getAttribute('data-id').toLowerCase();
+          const total = card.getAttribute('data-total').toLowerCase();
+          const pago = card.getAttribute('data-pago').toLowerCase();
+          const estado = card.getAttribute('data-estado').toLowerCase();
+          const fecha = card.getAttribute('data-fecha').toLowerCase();
+
+          const matchesStatus = (activeOrderStatusFilter === 'todos' || estado === activeOrderStatusFilter);
+          
+          const matchesQuery = !query || 
+              id.includes(query) || 
+              total.includes(query) || 
+              pago.includes(query) || 
+              estado.includes(query) || 
+              fecha.includes(query);
+
+          if (matchesStatus && matchesQuery) {
+              card.style.display = 'block';
+              visibleCount++;
+          } else {
+              card.style.display = 'none';
+          }
+      });
+
+      let noResultsMsg = document.getElementById('no-orders-results');
+      if (visibleCount === 0) {
+          if (!noResultsMsg) {
+              const msg = document.createElement('div');
+              msg.id = 'no-orders-results';
+              msg.style.textAlign = 'center';
+              msg.style.padding = '50px';
+              msg.style.background = 'white';
+              msg.style.borderRadius = '24px';
+              msg.style.border = '1px solid var(--glass-border)';
+              msg.style.color = 'var(--text-medium)';
+              msg.style.fontWeight = '700';
+              msg.textContent = 'No se encontraron pedidos que coincidan con tu búsqueda.';
+              document.querySelector('.orders-container').appendChild(msg);
+          }
+      } else {
+          if (noResultsMsg) {
+              noResultsMsg.remove();
+          }
+      }
   }
 
   // Gestión de Notificaciones
@@ -1452,11 +1607,23 @@ if (!empty($pedidos)) {
       pane.classList.toggle('active');
   }
 
-  // Cancelación segura de pedido
+  // Cancelación segura de pedido (Premium Custom Modal Dialog)
+  let activeCancelOrderId = null;
+
   function confirmCancelOrder(id) {
-      if (!confirm('¿Estás seguro de que deseas cancelar este pedido? Se liberará el stock inmediatamente y la devolución de fondos será procesada.')) {
-          return;
-      }
+      activeCancelOrderId = id;
+      document.getElementById('confirm-cancel-modal').classList.add('active');
+  }
+
+  function closeConfirmCancelModal() {
+      document.getElementById('confirm-cancel-modal').classList.remove('active');
+      activeCancelOrderId = null;
+  }
+
+  function executeCancelOrder() {
+      if (!activeCancelOrderId) return;
+      const id = activeCancelOrderId;
+      closeConfirmCancelModal();
 
       fetch('forms/cancelar_pedido.php', {
           method: 'POST',
@@ -1541,6 +1708,26 @@ if (!empty($pedidos)) {
       }
   }
 </script>
+
+<!-- Barra de Navegación Inferior Móvil (Requirement 1 & 2) -->
+<nav class="mobile-nav" style="display:none; position:fixed; bottom:0; left:0; width:100%; height:50px; background:rgba(255, 255, 255, 0.98); box-shadow:0 -5px 20px rgba(70, 40, 0, 0.05); border-top:1px solid rgba(213, 164, 112, 0.15); z-index:999999; grid-template-columns:repeat(4, 1fr); align-items:center;">
+  <button class="mobile-nav-btn active" onclick="switchTab('catalogo', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
+    <span style="font-size:15px; transition:transform 0.2s ease;">▦</span>
+    <span>Catálogo</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="switchTab('pedidos', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
+    <span style="font-size:15px; transition:transform 0.2s ease;">▤</span>
+    <span>Pedidos</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="switchTab('regalias', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
+    <span style="font-size:15px; transition:transform 0.2s ease;">◈</span>
+    <span>Regalías</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="switchTab('perfil', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
+    <span style="font-size:15px; transition:transform 0.2s ease;">👤</span>
+    <span>Perfil</span>
+  </button>
+</nav>
 
 <style>
   @keyframes spin {
