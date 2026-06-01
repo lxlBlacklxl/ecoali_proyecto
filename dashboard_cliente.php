@@ -1584,8 +1584,6 @@ if (!empty($pedidos)) {
   }
 
   function clearAllNotifications() {
-      if (!confirm('¿Estás seguro de que deseas borrar todas las notificaciones?')) return;
-      
       const items = document.querySelectorAll('#notif-items-container .notif-item');
       if (items.length > 0) {
           items.forEach((item, idx) => {
