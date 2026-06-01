@@ -617,6 +617,24 @@ if (!empty($pedidos)) {
     .order-details-pane.active {
       display: block !important;
     }
+
+    /* Soporte Responsivo Completo para Dispositivos Móviles y Tablets */
+    @media (max-width: 480px) {
+      .notification-drawer {
+        width: 100% !important;
+        right: -100% !important;
+      }
+      .notification-drawer.active {
+        right: 0 !important;
+      }
+      .cart-drawer {
+        width: 100% !important;
+        right: -100% !important;
+      }
+      .cart-drawer.active {
+        right: 0 !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1450,15 +1468,30 @@ if (!empty($pedidos)) {
 
       activeNotifs.forEach(notif => {
           container.innerHTML += `
-            <div class="notif-item ${notif.tipo || 'info'}">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="notif-item ${notif.tipo || 'info'}" style="position:relative; padding-right:32px;">
+              <button onclick="deleteSingleNotification('${notif.id}', event)" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:18px; color:#b02500; cursor:pointer; font-weight:bold; transition:var(--transition-fast); line-height:1;" onmouseover="this.style.transform='scale(1.2)';" onmouseout="this.style.transform='scale(1)';">×</button>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <strong style="font-size:13px; color:var(--text-dark);">${notif.titulo}</strong>
-                <small style="font-size:9px; color:var(--text-medium); font-weight:800;">${notif.fecha}</small>
+                <small style="font-size:9px; color:var(--text-medium); font-weight:800; white-space:nowrap;">${notif.fecha}</small>
               </div>
-              <p style="margin:0; font-size:12px; color:var(--text-medium); line-height:1.5;">${notif.mensaje}</p>
+              <p style="margin:0; margin-top:4px; font-size:12px; color:var(--text-medium); line-height:1.5;">${notif.mensaje}</p>
             </div>
           `;
       });
+  }
+
+  function deleteSingleNotification(id, event) {
+      if (event) event.stopPropagation();
+      if (!deletedNotifIds.includes(id)) {
+          deletedNotifIds.push(id);
+      }
+      if (!readNotifIds.includes(id)) {
+          readNotifIds.push(id);
+      }
+      localStorage.setItem('ecoali_deleted_notifs_' + <?php echo $cliente_id; ?>, JSON.stringify(deletedNotifIds));
+      localStorage.setItem('ecoali_read_notifs_' + <?php echo $cliente_id; ?>, JSON.stringify(readNotifIds));
+      renderNotifications();
+      updateNotifBadge();
   }
 
   function clearAllNotifications() {

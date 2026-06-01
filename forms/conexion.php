@@ -10,7 +10,7 @@
  */
 
 // 1. CONFIGURACIÓN DE PARÁMETROS DEL SERVIDOR DE BASE DE DATOS
-$host = "localhost";
+$host = "127.0.0.1";
 $usuario = "root";
 $password = "";
 $bd = "ecoali";
