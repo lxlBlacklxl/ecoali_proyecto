@@ -1886,6 +1886,8 @@ if (!empty($pedidos)) {
       totalEl.textContent = '$' + total.toFixed(2);
   }
 
+  let isCheckoutProcessing = false;
+
   // checkout Wizard
   function openCheckoutWizard() {
       if (ecoaliCart.length === 0) {
@@ -2020,6 +2022,8 @@ if (!empty($pedidos)) {
   function submitCheckoutSimulated(e) {
       e.preventDefault();
       
+      if (isCheckoutProcessing) return;
+      
       const num = document.getElementById('cc-number').value.trim();
       const name = document.getElementById('cc-name').value.trim();
       const exp = document.getElementById('cc-exp').value.trim();
@@ -2059,6 +2063,8 @@ if (!empty($pedidos)) {
   }
 
   function simulateThirdPartyPayment(platform) {
+      if (isCheckoutProcessing) return;
+      
       const label = platform === 'paypal' ? 'PayPal Secure Login...' : 'Mercado Pago Checkout...';
       const confirmMsg = platform === 'paypal' 
           ? '¿Simular ingreso de sesión y autorizar pago seguro con PayPal?' 
@@ -2075,6 +2081,9 @@ if (!empty($pedidos)) {
   }
 
   function executeFinalPurchase(metodo, estado) {
+      if (isCheckoutProcessing) return;
+      isCheckoutProcessing = true;
+
       const dir = document.getElementById('chk-direccion').value;
       const tel = document.getElementById('chk-telefono').value;
       const ref = document.getElementById('chk-referido').value;
@@ -2109,7 +2118,9 @@ if (!empty($pedidos)) {
                   'var(--secondary)',
                   true
               );
+              isCheckoutProcessing = false;
           } else {
+              isCheckoutProcessing = false;
               showAlertModal('Error', data.message, '✗', '#b02500');
               const btn = document.getElementById('btn-pay-submit');
               if (btn) {
@@ -2120,6 +2131,7 @@ if (!empty($pedidos)) {
       })
       .catch(err => {
           console.error(err);
+          isCheckoutProcessing = false;
           showAlertModal('Error', 'No se pudo procesar tu transacción de forma segura.', '✗', '#b02500');
           const btn = document.getElementById('btn-pay-submit');
           if (btn) {
