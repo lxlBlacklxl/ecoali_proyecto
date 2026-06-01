@@ -1700,6 +1700,16 @@ while ($row = $resHist->fetch_assoc()) {
 
   // Inicialización del Mapa Leaflet para Paradas Activas
   document.addEventListener('DOMContentLoaded', () => {
+      // Cerrar modal de historial al hacer clic fuera del contenedor blanco
+      const histModal = document.getElementById('history-detail-modal');
+      if (histModal) {
+          histModal.addEventListener('click', function(e) {
+              if (e.target === this) {
+                  closeHistoryDetailModal();
+              }
+          });
+      }
+
       const mapContainer = document.getElementById('leaflet-map');
       if (mapContainer) {
           // Coordenadas del Almacén Central de EcoAli (Sevilla, España)
