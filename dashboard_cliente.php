@@ -39,6 +39,34 @@ $profile = $resProfile->fetch_assoc();
 $direccion = $profile["direccion"] ?? "";
 $telefono = $profile["telefono"] ?? "";
 
+// --- DESCOMPOSICIÓN DE DIRECCIÓN EXISTENTE EN COMPONENTES ---
+$savedCalle = '';
+$savedNumero = '';
+$savedColonia = '';
+$savedCP = '';
+$savedCiudad = '';
+$savedLocalidad = '';
+
+if (!empty($direccion)) {
+    $parts = explode(',', $direccion);
+    $savedCalle = isset($parts[0]) ? trim($parts[0]) : $direccion;
+    if (isset($parts[1])) {
+        $savedNumero = trim(str_replace('#', '', $parts[1]));
+    }
+    if (isset($parts[2])) {
+        $savedColonia = trim(str_replace('Col.', '', $parts[2]));
+    }
+    if (isset($parts[3])) {
+        $savedCP = trim(str_replace('C.P.', '', $parts[3]));
+    }
+    if (isset($parts[4])) {
+        $savedCiudad = trim($parts[4]);
+    }
+    if (isset($parts[5])) {
+        $savedLocalidad = trim($parts[5]);
+    }
+}
+
 // 2. Obtener productos activos de la BD con stock disponible real-time (Requirement 1)
 $productosRes = $conn->query("SELECT p.*, COALESCE(SUM(i.cantidad), 0) AS stock_total 
                              FROM productos p 
@@ -1128,9 +1156,46 @@ if (!empty($pedidos)) {
       <p style="font-size:13px; color:var(--text-medium); line-height:1.5; margin-bottom:20px;">Confirma dónde quieres que el repartidor entregue tus huevos frescos.</p>
       
       <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- Fila 1: Calle y Número (2 columnas) -->
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CALLE *</label>
+            <input type="text" id="chk-calle" value="<?php echo htmlspecialchars($savedCalle); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Av. de la Constitución">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">NÚMERO *</label>
+            <input type="text" id="chk-numero" value="<?php echo htmlspecialchars($savedNumero); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 45">
+          </div>
+        </div>
+
+        <!-- Fila 2: Colonia y Código Postal (2 columnas) -->
+        <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">COLONIA / BARRIO *</label>
+            <input type="text" id="chk-colonia" value="<?php echo htmlspecialchars($savedColonia); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Centro">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CÓDIGO POSTAL *</label>
+            <input type="text" id="chk-cp" value="<?php echo htmlspecialchars($savedCP); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 41001">
+          </div>
+        </div>
+
+        <!-- Fila 3: Ciudad y Localidad (2 columnas) -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CIUDAD *</label>
+            <input type="text" id="chk-ciudad" value="<?php echo htmlspecialchars($savedCiudad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Sevilla">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">LOCALIDAD / MUNICIPIO *</label>
+            <input type="text" id="chk-localidad" value="<?php echo htmlspecialchars($savedLocalidad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Sevilla">
+          </div>
+        </div>
+
+        <!-- Fila 4: Dirección Completa Generada (Solo Lectura) -->
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN DE ENTREGA COMPLETA</label>
-          <input type="text" id="chk-direccion" value="<?php echo htmlspecialchars($direccion); ?>" required oninput="validateStep1Fields()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px;" placeholder="Calle, barrio, municipio o localidad">
+          <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN COMPLETA FORMATEADA (VISTA PREVIA)</label>
+          <input type="text" id="chk-direccion" value="<?php echo htmlspecialchars($direccion); ?>" readonly style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; background:#fbf8f5; color:#705b44; cursor:not-allowed; font-family:inherit; font-weight:600; font-size:13px;" placeholder="Se generará automáticamente conforme llenes los campos...">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:800; color:var(--text-medium);">TELÉFONO DE CONTACTO</label>
@@ -1820,6 +1885,27 @@ if (!empty($pedidos)) {
 
       document.getElementById('checkout-modal').classList.add('active');
       goToCheckoutStep(1);
+      updateConcatenatedAddress();
+  }
+
+  function updateConcatenatedAddress() {
+      const calle = document.getElementById('chk-calle').value.trim();
+      const numero = document.getElementById('chk-numero').value.trim();
+      const colonia = document.getElementById('chk-colonia').value.trim();
+      const cp = document.getElementById('chk-cp').value.trim();
+      const ciudad = document.getElementById('chk-ciudad').value.trim();
+      const localidad = document.getElementById('chk-localidad').value.trim();
+      
+      let parts = [];
+      if (calle) parts.push(calle);
+      if (numero) parts.push('#' + numero);
+      if (colonia) parts.push('Col. ' + colonia);
+      if (cp) parts.push('C.P. ' + cp);
+      if (ciudad) parts.push(ciudad);
+      if (localidad) parts.push(localidad);
+      
+      const fullDir = parts.join(', ');
+      document.getElementById('chk-direccion').value = fullDir;
       validateStep1Fields();
   }
 
