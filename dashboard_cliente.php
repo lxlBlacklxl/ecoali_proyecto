@@ -550,6 +550,20 @@ if (!empty($pedidos)) {
       display: flex;
       flex-direction: column;
       gap: 6px;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, margin 0.4s ease, padding 0.4s ease, max-height 0.4s ease;
+      max-height: 200px;
+      overflow: hidden;
+    }
+    .notif-item.slide-out-left {
+      transform: translateX(-110%) !important;
+      opacity: 0 !important;
+      max-height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      border-top: 0 !important;
+      border-bottom: 0 !important;
     }
     .notif-item.success { border-left-color: var(--secondary); }
     .notif-item.warning { border-left-color: var(--primary); }
@@ -1544,6 +1558,19 @@ if (!empty($pedidos)) {
 
   function deleteSingleNotification(id, event) {
       if (event) event.stopPropagation();
+      
+      const item = event ? event.target.closest('.notif-item') : null;
+      if (item) {
+          item.classList.add('slide-out-left');
+          setTimeout(() => {
+              commitSingleNotificationDelete(id);
+          }, 400);
+      } else {
+          commitSingleNotificationDelete(id);
+      }
+  }
+
+  function commitSingleNotificationDelete(id) {
       if (!deletedNotifIds.includes(id)) {
           deletedNotifIds.push(id);
       }
@@ -1559,6 +1586,23 @@ if (!empty($pedidos)) {
   function clearAllNotifications() {
       if (!confirm('¿Estás seguro de que deseas borrar todas las notificaciones?')) return;
       
+      const items = document.querySelectorAll('#notif-items-container .notif-item');
+      if (items.length > 0) {
+          items.forEach((item, idx) => {
+              setTimeout(() => {
+                  item.classList.add('slide-out-left');
+              }, idx * 60);
+          });
+          
+          setTimeout(() => {
+              commitClearAllNotifications();
+          }, 400 + (items.length * 60));
+      } else {
+          commitClearAllNotifications();
+      }
+  }
+
+  function commitClearAllNotifications() {
       ecoaliNotifications.forEach(n => {
           if (!deletedNotifIds.includes(n.id)) {
               deletedNotifIds.push(n.id);
