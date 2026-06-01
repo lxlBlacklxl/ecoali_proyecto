@@ -202,6 +202,9 @@ if (!empty($pedidos)) {
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   
   <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     :root {
       --bg-organic: #fffaf7;
       --primary: #ff8a00;
@@ -622,6 +625,59 @@ if (!empty($pedidos)) {
     /* Cart drawer safety constraint */
     .cart-drawer {
       overflow: hidden !important;
+      height: 100vh !important;
+      max-height: 100vh !important;
+      box-sizing: border-box !important;
+      z-index: 1000000 !important;
+    }
+    
+    .cart-drawer-overlay {
+      z-index: 999999 !important;
+    }
+    
+    .notification-drawer {
+      overflow: hidden !important;
+      height: 100vh !important;
+      max-height: 100vh !important;
+      box-sizing: border-box !important;
+      z-index: 1000000 !important;
+    }
+
+    .notification-drawer-overlay {
+      z-index: 999999 !important;
+    }
+
+    /* Estilizado del Footer y Contenedores */
+    .cart-footer {
+      box-sizing: border-box !important;
+    }
+    .notif-footer {
+      box-sizing: border-box !important;
+    }
+
+    /* Adaptación fluida para pantallas con poca altura vertical (ej. laptops, zoom) */
+    @media (max-height: 768px) {
+      .cart-footer {
+        padding: 12px 18px !important;
+        gap: 6px !important;
+      }
+      .cart-footer button {
+        height: 40px !important;
+      }
+      .cart-items-list {
+        padding: 16px !important;
+        gap: 12px !important;
+      }
+      .notif-footer {
+        padding: 10px 16px !important;
+      }
+      .notif-footer button {
+        height: 40px !important;
+      }
+      #notif-items-container {
+        padding: 16px !important;
+        gap: 12px !important;
+      }
     }
 
     /* Soporte Responsivo Completo para Dispositivos Móviles y Tablets */
@@ -985,7 +1041,7 @@ if (!empty($pedidos)) {
   <div style="flex-grow:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:16px;" id="notif-items-container">
     <!-- Cargado vía JavaScript -->
   </div>
-  <div style="padding:16px 24px; background:white; border-top:1px solid var(--glass-border); display:flex; justify-content:center;">
+  <div class="notif-footer" style="padding:16px 24px; background:white; border-top:1px solid var(--glass-border); display:flex; justify-content:center;">
     <button onclick="clearAllNotifications()" style="width:100%; height:46px; border-radius:12px; border:1px solid #b02500; background:transparent; color:#b02500; font-size:13px; font-weight:800; cursor:pointer; transition:var(--transition-fast);" onmouseover="this.style.background='#b02500'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#b02500';">
       🗑 Borrar Todas las Notificaciones
     </button>
@@ -1004,7 +1060,7 @@ if (!empty($pedidos)) {
     <!-- Cargado por JS -->
   </div>
 
-  <div style="padding:24px; background:white; border-top:1px solid var(--glass-border); display:flex; flex-direction:column; gap:12px;">
+  <div class="cart-footer" style="padding:24px; background:white; border-top:1px solid var(--glass-border); display:flex; flex-direction:column; gap:12px;">
     <!-- Entrada de Cupón de Fidelización -->
     <div style="display:flex; gap:8px; margin-bottom:4px;">
       <input type="text" id="cupon-input" style="flex-grow:1; height:38px; border-radius:8px; border:1px solid var(--glass-border); padding:0 10px; font-size:11px; font-weight:700; text-transform:uppercase;" placeholder="CÓDIGO DE CUPÓN">
