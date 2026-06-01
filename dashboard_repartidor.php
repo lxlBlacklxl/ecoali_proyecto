@@ -785,6 +785,16 @@ while ($row = $resHist->fetch_assoc()) {
       }
       .form-grid { grid-template-columns: 1fr; }
     }
+
+    /* Opaque white background override for History Detail Modal & Alert Modal */
+    #history-detail-modal .modal-container,
+    #alert-modal .modal-container {
+      background: #ffffff !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      border: 1px solid rgba(213, 164, 112, 0.4) !important;
+      box-shadow: 0 24px 60px rgba(50, 37, 20, 0.25) !important;
+    }
   </style>
 </head>
 <body>
