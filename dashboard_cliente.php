@@ -533,6 +533,7 @@ if (!empty($pedidos)) {
       display: flex;
       flex-direction: column;
       transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
     }
     .notification-drawer.active {
       right: 0;
@@ -616,6 +617,11 @@ if (!empty($pedidos)) {
     /* Order details pane active state */
     .order-details-pane.active {
       display: block !important;
+    }
+
+    /* Cart drawer safety constraint */
+    .cart-drawer {
+      overflow: hidden !important;
     }
 
     /* Soporte Responsivo Completo para Dispositivos Móviles y Tablets */
