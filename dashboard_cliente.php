@@ -1055,7 +1055,7 @@ if (!empty($pedidos)) {
   <div style="flex-grow:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:16px;" id="notif-items-container">
     <!-- Cargado vía JavaScript -->
   </div>
-  <div class="notif-footer" style="padding:16px 24px; background:white; border-top:1px solid var(--glass-border); display:flex; justify-content:center;">
+  <div class="notif-footer" id="notif-clear-footer" style="padding:16px 24px; background:white; border-top:1px solid var(--glass-border); display:flex; justify-content:center;">
     <button onclick="clearAllNotifications()" style="width:100%; height:46px; border-radius:12px; border:1px solid #b02500; background:transparent; color:#b02500; font-size:13px; font-weight:800; cursor:pointer; transition:var(--transition-fast);" onmouseover="this.style.background='#b02500'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#b02500';">
       🗑 Borrar Todas las Notificaciones
     </button>
@@ -1531,8 +1531,10 @@ if (!empty($pedidos)) {
       container.innerHTML = '';
       
       const activeNotifs = ecoaliNotifications.filter(n => !deletedNotifIds.includes(n.id));
+      const footer = document.getElementById('notif-clear-footer');
       
       if (activeNotifs.length === 0) {
+          if (footer) footer.style.display = 'none';
           container.innerHTML = `
             <div style="text-align:center; padding:50px 10px; color:var(--text-medium); font-weight:700;">
               <span style="font-size:36px; display:block; margin-bottom:12px;">🔔</span>
@@ -1541,6 +1543,8 @@ if (!empty($pedidos)) {
           `;
           return;
       }
+      
+      if (footer) footer.style.display = 'flex';
 
       activeNotifs.forEach(notif => {
           container.innerHTML += `
