@@ -222,8 +222,8 @@ try {
         }
     }
 
-    // 6. ACTUALIZAR DIRECCIÓN Y TELÉFONO EN EL PERFIL
-    $stmtProfileUpdate = $conn->prepare("UPDATE usuario_perfil SET direccion = IF(direccion = '' OR direccion IS NULL, ?, direccion), telefono = IF(telefono = '' OR telefono IS NULL, ?, telefono) WHERE usuario_id = ?");
+    // 6. ACTUALIZAR DIRECCIÓN Y TELÉFONO EN EL PERFIL CON LOS DATOS DE ESTA COMPRA
+    $stmtProfileUpdate = $conn->prepare("UPDATE usuario_perfil SET direccion = ?, telefono = ? WHERE usuario_id = ?");
     $stmtProfileUpdate->bind_param("ssi", $direccion, $telefono, $cliente_id);
     $stmtProfileUpdate->execute();
 

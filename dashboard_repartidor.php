@@ -50,7 +50,7 @@ $stmtRuta->execute();
 $resRuta = $stmtRuta->get_result();
 $entregasEnRuta = (int)($resRuta->fetch_row()[0] ?? 0);
 
-$stmtPrepSystem = $conn->query("SELECT COUNT(*) FROM pedidos WHERE estado = 'preparado' AND (repartidor_id IS NULL OR repartidor_id = $repartidor_id)");
+$stmtPrepSystem = $conn->query("SELECT COUNT(*) FROM pedidos WHERE (estado = 'preparado' OR (estado = 'pendiente' AND repartidor_id = $repartidor_id)) AND (repartidor_id IS NULL OR repartidor_id = $repartidor_id)");
 $entregasPreparadas = $stmtPrepSystem ? (int)($stmtPrepSystem->fetch_row()[0] ?? 0) : 0;
 
 // 3. Obtener Próximas Paradas (Hojas de Ruta de Entregas Activas)
@@ -58,7 +58,7 @@ $rutasQuery = "SELECT p.id, p.total, p.estado, p.fecha_pedido, p.metodo_pago, p.
                       up.nombre AS cliente_nombre, up.apellido AS cliente_apellido, up.telefono AS cliente_telefono
                FROM pedidos p
                INNER JOIN usuario_perfil up ON p.cliente_id = up.usuario_id
-               WHERE (p.repartidor_id = ? AND p.estado IN ('preparado', 'en_ruta'))
+               WHERE (p.repartidor_id = ? AND p.estado IN ('pendiente', 'preparado', 'en_ruta'))
                   OR (p.repartidor_id IS NULL AND p.estado = 'preparado')
                ORDER BY p.estado DESC, p.id ASC";
 $stmtRutas = $conn->prepare($rutasQuery);
@@ -932,7 +932,7 @@ while ($row = $resHist->fetch_assoc()) {
               </div>
 
               <div>
-                <?php if ($est === "preparado"): ?>
+                <?php if ($est === "pendiente" || $est === "preparado"): ?>
                   <button class="action-btn" onclick="updateDeliveryStatus(<?php echo $parada['id']; ?>, 'en_ruta')">
                     Iniciar Ruta ➜
                   </button>
