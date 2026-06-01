@@ -94,6 +94,7 @@ while ($row = $resHist->fetch_assoc()) {
   <title>Panel de Repartidor - ECOALI</title>
 
   <link rel="stylesheet" href="assets/css/globals.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   
   <style>
@@ -108,6 +109,11 @@ while ($row = $resHist->fetch_assoc()) {
       --glass-border: rgba(213, 164, 112, 0.25);
       --shadow-premium: 0 16px 40px rgba(50, 37, 20, 0.06);
       --transition-fast: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
     }
 
     body {
@@ -456,6 +462,23 @@ while ($row = $resHist->fetch_assoc()) {
     .badge-status.pendiente { background: rgba(255, 138, 0, 0.12); color: var(--primary); }
     .badge-status.preparado { background: rgba(23, 134, 186, 0.12); color: #1786ba; }
     .badge-status.en_ruta { background: rgba(23, 106, 33, 0.12); color: var(--secondary); }
+
+    .action-btn-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    @media (max-width: 991px) {
+      .action-btn-group {
+        flex-direction: column;
+        width: 100%;
+        grid-column: 1 / -1;
+      }
+      .action-btn-group a,
+      .action-btn-group button {
+        width: 100% !important;
+      }
+    }
 
     .action-btn {
       background: var(--primary);
@@ -853,75 +876,13 @@ while ($row = $resHist->fetch_assoc()) {
     <!-- PESTAÑA: HOJA DE RUTA -->
     <section id="tab-hoja-ruta" class="tab-pane">
       
+      <?php if (!empty($paradasActivas)): ?>
       <!-- Interactive Distribution Routing Map -->
       <div class="routing-map-card">
         <h3>Ruta de Distribución Optimizada</h3>
         <p>Trazado en tiempo real desde el Almacén Central EcoAli y secuencia óptima de entrega para ahorro de energía y emisiones.</p>
         
-        <div class="map-canvas-container">
-          <!-- Responsive Inline SVG Distribution Map -->
-          <svg viewBox="0 0 600 240" width="100%" height="100%" style="font-family: inherit;">
-            <defs>
-              <linearGradient id="routeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#176a21" />
-                <stop offset="50%" stop-color="#ff8a00" />
-                <stop offset="100%" stop-color="#2ea33c" />
-              </linearGradient>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="5" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
-            
-            <!-- Road Paths (Connecting Nodes) -->
-            <path d="M 50,120 Q 120,60 200,80 T 350,170 T 500,100" fill="none" stroke="url(#routeGrad)" stroke-width="5" stroke-linecap="round" stroke-dasharray="10 6" />
-            
-            <!-- Node 0: Central Warehouse -->
-            <circle cx="50" cy="120" r="16" fill="#176a21" filter="url(#glow)" />
-            <text x="50" y="120" fill="white" font-weight="900" font-size="10" text-anchor="middle" dominant-baseline="central">🏭</text>
-            <text x="50" y="145" fill="var(--text-dark)" font-weight="800" font-size="10" text-anchor="middle">Central EcoAli</text>
-            
-            <?php 
-            $mapCoords = [
-                1 => ["x" => 200, "y" => 80],
-                2 => ["x" => 350, "y" => 170],
-                3 => ["x" => 500, "y" => 100]
-            ];
-            
-            $activeTruckX = 50; 
-            $activeTruckY = 120;
-            
-            $idx = 1;
-            foreach ($paradasActivas as $parada) {
-                if ($idx <= 3) {
-                    $c = $mapCoords[$idx];
-                    $est = strtolower($parada["estado"]);
-                    $fillColor = ($est === "en_ruta") ? "var(--primary)" : "#b5a38f";
-                    if ($est === "en_ruta") {
-                        $activeTruckX = $c["x"];
-                        $activeTruckY = $c["y"] - 22; // Offset over point
-                    }
-                    ?>
-                    <!-- Route Node -->
-                    <circle cx="<?php echo $c['x']; ?>" cy="<?php echo $c['y']; ?>" r="14" fill="<?php echo $fillColor; ?>" />
-                    <text x="<?php echo $c['x']; ?>" cy="<?php echo $c['y']; ?>" fill="white" font-weight="900" font-size="9" text-anchor="middle" dominant-baseline="central">#<?php echo $idx; ?></text>
-                    <text x="<?php echo $c['x']; ?>" y="<?php echo $c['y'] + 22; ?>" fill="var(--text-dark)" font-weight="800" font-size="9" text-anchor="middle">Parada #<?php echo $parada['id']; ?></text>
-                    <?php
-                }
-                $idx++;
-            }
-            ?>
-            
-            <!-- Delivery Truck vehicle icon (moving dynamically to active node) -->
-            <g transform="translate(<?php echo $activeTruckX - 16; ?>, <?php echo $activeTruckY - 14; ?>)" filter="url(#glow)">
-              <rect width="32" height="18" rx="4" fill="var(--primary)" />
-              <rect x="22" y="3" width="8" height="10" rx="1" fill="#fff" />
-              <circle cx="8" cy="18" r="4" fill="#333" />
-              <circle cx="24" cy="18" r="4" fill="#333" />
-              <text x="14" y="11" fill="white" font-size="9" font-weight="bold" text-anchor="middle">🚚</text>
-            </g>
-          </svg>
-        </div>
+        <div id="leaflet-map" style="width: 100%; height: 350px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium); z-index: 1;"></div>
         
         <div style="display:flex; justify-content: space-between; margin-top: 15px; font-size: 11px; font-weight: 800; color: var(--text-medium); text-transform: uppercase;">
           <span>🚦 Tránsito: Fluido</span>
@@ -929,6 +890,7 @@ while ($row = $resHist->fetch_assoc()) {
           <span>📍 Satélites: Conectado</span>
         </div>
       </div>
+      <?php endif; ?>
 
       <!-- Paradas list -->
       <div class="stops-container">
@@ -961,9 +923,16 @@ while ($row = $resHist->fetch_assoc()) {
                     Iniciar Ruta ➜
                   </button>
                 <?php elseif ($est === "en_ruta"): ?>
-                  <button class="action-btn deliver" onclick="openManageStopModal(<?php echo $parada['id']; ?>, '<?php echo htmlspecialchars($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido']); ?>', '<?php echo htmlspecialchars($parada['pedido_direccion']); ?>')">
-                    Gestionar Parada ✓
-                  </button>
+                  <div class="action-btn-group">
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=<?php echo urlencode($parada['pedido_direccion']); ?>" target="_blank" style="text-decoration:none;">
+                      <button class="action-btn" style="background:#1786ba; box-shadow: 0 8px 16px rgba(23,134,186,0.2);">
+                        Iniciar Ruta 🧭
+                      </button>
+                    </a>
+                    <button class="action-btn deliver" onclick="openManageStopModal(<?php echo $parada['id']; ?>, '<?php echo htmlspecialchars($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido']); ?>', '<?php echo htmlspecialchars($parada['pedido_direccion']); ?>')">
+                      Gestionar Parada ✓
+                    </button>
+                  </div>
                 <?php endif; ?>
               </div>
             </article>
@@ -1202,8 +1171,11 @@ while ($row = $resHist->fetch_assoc()) {
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
   // Tab Switcher
+  let leafletMapInstance = null; // Instancia global del mapa
+
   function switchTab(tabName, element) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + tabName).classList.add('active');
@@ -1225,6 +1197,13 @@ while ($row = $resHist->fetch_assoc()) {
       if (titles[tabName]) {
           document.getElementById('page-title').textContent = titles[tabName].title;
           document.getElementById('page-subtitle').textContent = titles[tabName].subtitle;
+      }
+
+      // Redibujar el mapa para corregir tamaño en contenedores previamente ocultos
+      if (tabName === 'hoja-ruta' && leafletMapInstance) {
+          setTimeout(() => {
+              leafletMapInstance.invalidateSize();
+          }, 200);
       }
   }
 
@@ -1531,6 +1510,89 @@ while ($row = $resHist->fetch_assoc()) {
           window.location.reload();
       }
   }
+
+  // Inicialización del Mapa Leaflet para Paradas Activas
+  document.addEventListener('DOMContentLoaded', () => {
+      const mapContainer = document.getElementById('leaflet-map');
+      if (mapContainer) {
+          // Coordenadas del Almacén Central de EcoAli (Sevilla, España)
+          const warehouseCoords = [37.3891, -5.9845];
+          
+          // Crear mapa Leaflet
+          leafletMapInstance = L.map('leaflet-map').setView(warehouseCoords, 13);
+
+          // Usar capa CartoDB Dark Matter para coincidir con la estética oscura premium del panel
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+              subdomains: 'abcd',
+              maxZoom: 20
+          }).addTo(leafletMapInstance);
+
+          // Icono del Almacén Central (Elegante y con sombra)
+          const warehouseIcon = L.divIcon({
+              html: `<div style="font-size:26px; filter: drop-shadow(0px 3px 6px rgba(23,106,33,0.6)); cursor:pointer;">🏭</div>`,
+              className: 'custom-warehouse-marker',
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
+          });
+
+          L.marker(warehouseCoords, { icon: warehouseIcon })
+              .addTo(leafletMapInstance)
+              .bindPopup('<strong>Almacén Central EcoAli</strong><br>Centro de operaciones de logística y cadena de frío.');
+
+          // Paradas cargadas dinámicamente desde PHP
+          const activeStops = <?php echo json_encode($paradasActivas); ?>;
+          const routePoints = [warehouseCoords];
+
+          activeStops.forEach((stop, idx) => {
+              // Generar coordenadas deterministas basadas en el ID de parada para distribuirlas en Sevilla
+              const seed = parseInt(stop.id) || 1;
+              const latOffset = Math.sin(seed * 123.456) * 0.012;
+              const lngOffset = Math.cos(seed * 456.789) * 0.012;
+              const stopCoords = [warehouseCoords[0] + latOffset, warehouseCoords[1] + lngOffset];
+              
+              routePoints.push(stopCoords);
+
+              // Usar camión animado si es la parada activa/en ruta, o pin clásico
+              const isEnRuta = stop.estado.toLowerCase() === 'en_ruta';
+              const iconEmoji = isEnRuta ? '🚚' : '📍';
+              const stopIcon = L.divIcon({
+                  html: `<div style="font-size:26px; position:relative; animation: bounce 2s infinite; cursor:pointer;">
+                            <span style="font-size: 22px;">${iconEmoji}</span>
+                            <span style="position:absolute; top:-10px; right:-10px; background:var(--primary); color:white; font-size:10px; font-weight:900; padding:2px 6px; border-radius:50%; border:1px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.2);">${idx + 1}</span>
+                         </div>`,
+                  className: 'custom-stop-marker',
+                  iconSize: [30, 30],
+                  iconAnchor: [15, 15]
+              });
+
+              L.marker(stopCoords, { icon: stopIcon })
+                  .addTo(leafletMapInstance)
+                  .bindPopup(`
+                      <div style="font-family:'Manrope',sans-serif; color:var(--text-dark); padding:4px;">
+                        <strong style="font-size:13px;">Parada #${idx + 1} - Pedido #PED-${String(stop.id).padStart(3, '0')}</strong><br>
+                        <span style="font-size:11px; display:block; margin-top:4px;">👤 Cliente: <b>${stop.cliente_nombre} ${stop.cliente_apellido}</b></span>
+                        <span style="font-size:11px; display:block;">📍 Dirección: <b>${stop.pedido_direccion}</b></span>
+                        <span style="font-size:11px; display:block; margin-bottom:6px;">📞 Teléfono: <b>${stop.cliente_telefono}</b></span>
+                        <span class="badge-status ${stop.estado.toLowerCase()}" style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px;">${stop.estado}</span>
+                      </div>
+                  `);
+          });
+
+          // Trazar línea de ruta elegante con guiones
+          L.polyline(routePoints, {
+              color: 'var(--primary)',
+              weight: 4,
+              opacity: 0.8,
+              dashArray: '8, 8',
+              lineJoin: 'round'
+          }).addTo(leafletMapInstance);
+
+          // Ajustar límites automáticamente
+          const bounds = L.latLngBounds(routePoints);
+          leafletMapInstance.fitBounds(bounds, { padding: [50, 50] });
+      }
+  });
 </script>
 
 </body>
