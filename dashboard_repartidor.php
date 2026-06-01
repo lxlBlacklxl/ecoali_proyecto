@@ -53,9 +53,13 @@ $entregasEnRuta = (int)($resRuta->fetch_row()[0] ?? 0);
 $stmtPrepSystem = $conn->query("SELECT COUNT(*) FROM pedidos WHERE (estado = 'preparado' OR (estado = 'pendiente' AND repartidor_id = $repartidor_id)) AND (repartidor_id IS NULL OR repartidor_id = $repartidor_id)");
 $entregasPreparadas = $stmtPrepSystem ? (int)($stmtPrepSystem->fetch_row()[0] ?? 0) : 0;
 
-// 3. Obtener Próximas Paradas (Hojas de Ruta de Entregas Activas)
 $rutasQuery = "SELECT p.id, p.total, p.estado, p.fecha_pedido, p.metodo_pago, p.pago_estado, up.direccion AS pedido_direccion, 
-                      up.nombre AS cliente_nombre, up.apellido AS cliente_apellido, up.telefono AS cliente_telefono
+                      up.nombre AS cliente_nombre, up.apellido AS cliente_apellido, up.telefono AS cliente_telefono,
+                      (SELECT SUM(cantidad) FROM detalle_pedido WHERE pedido_id = p.id) AS total_items,
+                      (SELECT GROUP_CONCAT(CONCAT(dp.cantidad, 'x ', pr.nombre) SEPARATOR ', ') 
+                       FROM detalle_pedido dp 
+                       INNER JOIN productos pr ON dp.producto_id = pr.id 
+                       WHERE dp.pedido_id = p.id) AS productos_detalle
                FROM pedidos p
                INNER JOIN usuario_perfil up ON p.cliente_id = up.usuario_id
                WHERE (p.repartidor_id = ? AND p.estado IN ('pendiente', 'preparado', 'en_ruta'))
@@ -893,8 +897,8 @@ while ($row = $resHist->fetch_assoc()) {
       <?php if (!empty($paradasActivas)): ?>
       <!-- Interactive Distribution Routing Map -->
       <div class="routing-map-card">
-        <h3>Ruta de Distribución Optimizada</h3>
-        <p>Trazado en tiempo real desde el Almacén Central EcoAli y secuencia óptima de entrega para ahorro de energía y emisiones.</p>
+        <h3>Ruta de Distribución Estática – <?php echo count($paradasActivas); ?> Pedidos por Entregar</h3>
+        <p>Secuencia fija y segura trazada para la entrega rápida de <?php echo count($paradasActivas); ?> pedidos orgánicos actualmente en tu hoja de ruta.</p>
         
         <div id="leaflet-map" style="width: 100%; height: 350px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium); z-index: 1;"></div>
         
@@ -923,7 +927,8 @@ while ($row = $resHist->fetch_assoc()) {
                   👤 Cliente: <strong><?php echo htmlspecialchars($parada["cliente_nombre"] . " " . $parada["cliente_apellido"]); ?></strong><br>
                   📍 Dirección: <strong><?php echo htmlspecialchars($parada["pedido_direccion"]); ?></strong><br>
                   📞 Teléfono: <strong><?php echo htmlspecialchars($parada["cliente_telefono"]); ?></strong><br>
-                  💳 Pago: <strong style="text-transform: uppercase; color:var(--secondary);"><?php echo htmlspecialchars($parada["metodo_pago"] . " (" . $parada["pago_estado"] . ")"); ?></strong>
+                  💳 Pago: <strong style="text-transform: uppercase; color:var(--secondary);"><?php echo htmlspecialchars($parada["metodo_pago"] . " (" . $parada["pago_estado"] . ")"); ?></strong><br>
+                  📦 Detalle de Carga: <strong style="color:var(--primary);"><?php echo htmlspecialchars($parada["productos_detalle"] ?? "Sin productos"); ?> (<?php echo (int)($parada["total_items"] ?? 0); ?> unidades)</strong>
                 </p>
               </div>
 
@@ -1719,8 +1724,16 @@ while ($row = $resHist->fetch_assoc()) {
           // Coordenadas del Almacén Central de EcoAli (Sevilla, España)
           const warehouseCoords = [37.3891, -5.9845];
           
-          // Crear mapa Leaflet
-          leafletMapInstance = L.map('leaflet-map').setView(warehouseCoords, 13);
+          // Crear mapa Leaflet estático (sin posibilidad de arrastre, zoom o interacción)
+          leafletMapInstance = L.map('leaflet-map', {
+              dragging: false,
+              zoomControl: false,
+              scrollWheelZoom: false,
+              doubleClickZoom: false,
+              touchZoom: false,
+              boxZoom: false,
+              keyboard: false
+          }).setView(warehouseCoords, 13);
 
           // Usar capa CartoDB Dark Matter para coincidir con la estética oscura premium del panel
           L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
