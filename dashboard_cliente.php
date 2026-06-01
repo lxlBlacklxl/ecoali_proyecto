@@ -565,7 +565,7 @@ if (!empty($pedidos)) {
       height: 100vh;
       background: rgba(0,0,0,0.4);
       backdrop-filter: blur(5px);
-      z-index: 200;
+      z-index: 2000000;
       opacity: 0;
       pointer-events: none;
       display: grid;
@@ -1764,6 +1764,9 @@ if (!empty($pedidos)) {
           showAlertModal('Carrito Vacío', 'Agrega algún producto al carrito antes de comprar.', '✗', '#b02500');
           return;
       }
+      
+      // Cerrar automáticamente el carrito de compras al abrir el checkout
+      toggleCart(false);
       
       const total = document.getElementById('cart-total').textContent;
       document.getElementById('paypal-amount').textContent = total;
