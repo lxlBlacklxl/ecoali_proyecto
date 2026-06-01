@@ -528,11 +528,15 @@ while ($row = $resHist->fetch_assoc()) {
     }
 
     .table-responsive {
+      width: 100%;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      display: block;
     }
 
     .data-table {
       width: 100%;
+      min-width: 900px; /* Evita que las columnas se encojan en móviles y activa el scroll horizontal táctil */
       border-collapse: collapse;
       text-align: left;
     }
