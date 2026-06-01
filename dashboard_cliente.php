@@ -44,7 +44,7 @@ $savedCalle = '';
 $savedNumero = '';
 $savedColonia = '';
 $savedCP = '';
-$savedCiudad = '';
+$savedEntidad = '';
 $savedLocalidad = '';
 
 if (!empty($direccion)) {
@@ -60,7 +60,7 @@ if (!empty($direccion)) {
         $savedCP = trim(str_replace('C.P.', '', $parts[3]));
     }
     if (isset($parts[4])) {
-        $savedCiudad = trim($parts[4]);
+        $savedEntidad = trim($parts[4]);
     }
     if (isset($parts[5])) {
         $savedLocalidad = trim($parts[5]);
@@ -1180,15 +1180,32 @@ if (!empty($pedidos)) {
           </div>
         </div>
 
-        <!-- Fila 3: Ciudad y Localidad (2 columnas) -->
+        <!-- Fila 3: Entidad Federativa y Localidad (2 columnas) -->
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
           <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CIUDAD *</label>
-            <input type="text" id="chk-ciudad" value="<?php echo htmlspecialchars($savedCiudad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Sevilla">
+            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">ENTIDAD FEDERATIVA *</label>
+            <select id="chk-estado" required onchange="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px; background-color:white; outline:none; cursor:pointer;">
+              <option value="">Selecciona...</option>
+              <?php
+              $mexicanStates = [
+                  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas",
+                  "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango",
+                  "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco",
+                  "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
+                  "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
+                  "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz",
+                  "Yucatán", "Zacatecas"
+              ];
+              foreach ($mexicanStates as $state) {
+                  $selected = ($savedEntidad === $state) ? 'selected' : '';
+                  echo "<option value=\"$state\" $selected>$state</option>";
+              }
+              ?>
+            </select>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             <label style="font-size:11px; font-weight:800; color:var(--text-medium);">LOCALIDAD / MUNICIPIO *</label>
-            <input type="text" id="chk-localidad" value="<?php echo htmlspecialchars($savedLocalidad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Sevilla">
+            <input type="text" id="chk-localidad" value="<?php echo htmlspecialchars($savedLocalidad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Ecatepec">
           </div>
         </div>
 
@@ -1893,7 +1910,7 @@ if (!empty($pedidos)) {
       const numero = document.getElementById('chk-numero').value.trim();
       const colonia = document.getElementById('chk-colonia').value.trim();
       const cp = document.getElementById('chk-cp').value.trim();
-      const ciudad = document.getElementById('chk-ciudad').value.trim();
+      const entidad = document.getElementById('chk-estado').value;
       const localidad = document.getElementById('chk-localidad').value.trim();
       
       let parts = [];
@@ -1901,7 +1918,7 @@ if (!empty($pedidos)) {
       if (numero) parts.push('#' + numero);
       if (colonia) parts.push('Col. ' + colonia);
       if (cp) parts.push('C.P. ' + cp);
-      if (ciudad) parts.push(ciudad);
+      if (entidad) parts.push(entidad);
       if (localidad) parts.push(localidad);
       
       const fullDir = parts.join(', ');
