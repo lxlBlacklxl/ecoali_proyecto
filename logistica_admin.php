@@ -433,8 +433,8 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
       </div>
 
       <div class="form-group">
-        <label class="form-label">Total del Pedido ($) *</label>
-        <input type="number" step="0.01" name="total" id="edit_total" class="form-input" required>
+        <label class="form-label">Total del Pedido ($) (Costo Fijo Inmutable) 🔒</label>
+        <input type="number" step="0.01" name="total" id="edit_total" class="form-input" readonly style="background:#f9f6f0; color:#8c7864; cursor:not-allowed; font-weight:700; border-color:#e0d5c1;" required>
       </div>
 
       <div class="form-group">
