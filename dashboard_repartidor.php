@@ -963,6 +963,7 @@ while ($row = $resHist->fetch_assoc()) {
                 <th>Fecha de Entrega</th>
                 <th>GPS / Coordenadas</th>
                 <th>Firma Digital</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -985,11 +986,16 @@ while ($row = $resHist->fetch_assoc()) {
                         <span style="font-size:11px; color:var(--text-medium);">No capturada</span>
                       <?php endif; ?>
                     </td>
+                    <td style="text-align:center;">
+                      <button onclick="openHistoryDetailModal(<?php echo $hist['id']; ?>)" style="background:var(--secondary); color:white; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer; transition:var(--transition-fast); display:inline-flex; align-items:center; gap:4px; box-shadow: 0 4px 8px rgba(23,106,33,0.15);" onmouseover="this.style.background='#2ea33c'; this.style.transform='scale(1.05)';" onmouseout="this.style.background='var(--secondary)'; this.style.transform='scale(1)';">
+                        Detalles 👁️
+                      </button>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
               <?php else: ?>
                 <tr>
-                  <td colspan="6" style="text-align:center; color:var(--text-medium); padding:30px;">
+                  <td colspan="7" style="text-align:center; color:var(--text-medium); padding:30px;">
                     Aún no registras entregas completadas en el historial.
                   </td>
                 </tr>
@@ -1168,6 +1174,58 @@ while ($row = $resHist->fetch_assoc()) {
     <button onclick="closeAlertModal()" style="background: var(--text-dark); color: white; border: none; padding: 12px 30px; border-radius: 12px; font-weight: 800; cursor: pointer;">
       Entendido
     </button>
+  </div>
+</div>
+
+<!-- Modal: Detalles del Pedido Entregado (Historial) -->
+<div class="modal-overlay" id="history-detail-modal">
+  <div class="modal-container" style="max-width: 650px; text-align: left; padding: 28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;">
+      <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: var(--text-dark);" id="modal-hist-title">Detalle de Pedido Entregado</h3>
+      <span onclick="closeHistoryDetailModal()" style="font-size: 24px; cursor: pointer; color: var(--text-medium); font-weight: bold; transition: var(--transition-fast);" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-medium)'">&times;</span>
+    </div>
+    
+    <div style="max-height: 480px; overflow-y: auto; padding-right: 6px;">
+      
+      <!-- Detalle Logístico General -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom: 20px;" id="modal-hist-meta">
+        <!-- Rellenado dinámicamente por JS -->
+      </div>
+      
+      <!-- Desglose de Productos Entregados -->
+      <h4 style="margin: 20px 0 10px; font-size: 13px; font-weight: 800; text-transform: uppercase; color: var(--primary); letter-spacing: 0.5px;">🥚 Productos Despachados</h4>
+      <div style="background: #fdfaf5; border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-medium); text-align: left;">
+              <th style="padding: 6px 0;">Producto</th>
+              <th style="padding: 6px 0; text-align: center;">Cant.</th>
+              <th style="padding: 6px 0; text-align: right;">Unitario</th>
+              <th style="padding: 6px 0; text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody id="modal-hist-items-body">
+            <!-- Rellenado dinámicamente por JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Evidencia Digital Capturada -->
+      <h4 style="margin: 20px 0 10px; font-size: 13px; font-weight: 800; text-transform: uppercase; color: var(--primary); letter-spacing: 0.5px;">📸 Evidencias de Control y Calidad</h4>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+        <div style="text-align: center; background: white; border: 1px solid var(--glass-border); padding: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+          <small style="font-weight: 800; color: var(--text-medium); display: block; margin-bottom: 8px;">✍️ Firma del Cliente</small>
+          <img id="modal-hist-firma-img" src="" style="max-height: 100px; max-width: 100%; border-radius: 6px; background:#fffbf5; border: 1px solid #eee; display:none;" alt="Firma digital">
+          <span id="modal-hist-firma-empty" style="font-size: 12px; color: var(--text-medium); display:block; padding: 10px 0;">No disponible</span>
+        </div>
+        <div style="text-align: center; background: white; border: 1px solid var(--glass-border); padding: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+          <small style="font-weight: 800; color: var(--text-medium); display: block; margin-bottom: 8px;">📷 Evidencia Fotográfica</small>
+          <img id="modal-hist-photo-img" src="" style="max-height: 100px; max-width: 100%; border-radius: 6px; object-fit: contain; border: 1px solid #eee; display:none;" alt="Evidencia fotográfica">
+          <span id="modal-hist-photo-empty" style="font-size: 12px; color: var(--text-medium); display:block; padding: 10px 0;">No disponible</span>
+        </div>
+      </div>
+      
+    </div>
   </div>
 </div>
 
@@ -1509,6 +1567,125 @@ while ($row = $resHist->fetch_assoc()) {
       if (reloadOnClose) {
           window.location.reload();
       }
+  }
+
+  // Control de Modal de Detalle de Historial (Pedidos Entregados)
+  function openHistoryDetailModal(pedidoId) {
+      // 1. Mostrar título del modal temporal
+      document.getElementById('modal-hist-title').textContent = `Cargando Detalles del Pedido #PED-${String(pedidoId).padStart(3, '0')}...`;
+      
+      // 2. Limpiar datos antiguos
+      document.getElementById('modal-hist-meta').innerHTML = '';
+      document.getElementById('modal-hist-items-body').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-medium);">Obteniendo información...</td></tr>';
+      
+      const firmaImg = document.getElementById('modal-hist-firma-img');
+      const firmaEmpty = document.getElementById('modal-hist-firma-empty');
+      const photoImg = document.getElementById('modal-hist-photo-img');
+      const photoEmpty = document.getElementById('modal-hist-photo-empty');
+      
+      firmaImg.style.display = 'none';
+      firmaImg.src = '';
+      firmaEmpty.style.display = 'block';
+      
+      photoImg.style.display = 'none';
+      photoImg.src = '';
+      photoEmpty.style.display = 'block';
+
+      // 3. Activar el modal
+      document.getElementById('history-detail-modal').classList.add('active');
+
+      // 4. Consumir API AJAX
+      fetch(`forms/obtener_detalle_pedido.php?pedido_id=${pedidoId}`)
+      .then(res => res.json())
+      .then(data => {
+          if (data.status === 'success') {
+              const cab = data.cabecera;
+              
+              // Cambiar título definitivo
+              document.getElementById('modal-hist-title').textContent = `Pedido #PED-${String(pedidoId).padStart(3, '0')}`;
+              
+              // Rellenar metadatos generales
+              document.getElementById('modal-hist-meta').innerHTML = `
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">📅 Fecha de Entrega</small>
+                    <span style="font-size:13px; font-weight:700; color:var(--text-dark);">${cab.fecha_entrega || "No registrada"}</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">💳 Pago y Estado</small>
+                    <span style="font-size:13px; font-weight:700; color:var(--secondary); text-transform:uppercase;">${cab.metodo_pago} (${cab.pago_estado})</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px; grid-column: 1 / -1;">
+                    <small style="font-weight:800; color:var(--text-medium);">📍 Coordenadas GPS</small>
+                    <span style="font-size:13px; font-family:monospace; background:#eee; padding:4px 8px; border-radius:6px; font-weight:700; color:var(--text-dark); width:fit-content;">${cab.coordenadas}</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">💵 Subtotal</small>
+                    <span style="font-size:13px; font-weight:700; color:var(--text-dark);">$${cab.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">📉 Descuento Aplicado</small>
+                    <span style="font-size:13px; font-weight:700; color:#b02500;">-$${cab.descuento.toFixed(2)}</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">📊 IVA Incluido (16%)</small>
+                    <span style="font-size:13px; font-weight:700; color:var(--text-dark);">$${cab.iva.toFixed(2)}</span>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <small style="font-weight:800; color:var(--text-medium);">💰 Total Cobrado</small>
+                    <span style="font-size:15px; font-weight:900; color:var(--secondary);">$${cab.total.toFixed(2)}</span>
+                  </div>
+              `;
+              
+              // Rellenar desglose de productos
+              let itemsHtml = '';
+              data.items.forEach(item => {
+                  itemsHtml += `
+                      <tr style="border-bottom: 1px solid #f6f0e5;">
+                        <td style="padding: 8px 0; font-weight:700; color:var(--text-dark);">${item.producto_nombre}</td>
+                        <td style="padding: 8px 0; text-align:center; font-weight:700;">${item.cantidad}</td>
+                        <td style="padding: 8px 0; text-align:right; color:var(--text-medium);">$${item.precio_unitario.toFixed(2)}</td>
+                        <td style="padding: 8px 0; text-align:right; font-weight:700; color:var(--text-dark);">$${item.subtotal.toFixed(2)}</td>
+                      </tr>
+                  `;
+              });
+              document.getElementById('modal-hist-items-body').innerHTML = itemsHtml;
+              
+              // Rellenar firma digital
+              if (cab.firma && cab.firma.length > 50) {
+                  firmaImg.src = cab.firma;
+                  firmaImg.style.display = 'inline-block';
+                  firmaEmpty.style.display = 'none';
+              } else {
+                  firmaImg.style.display = 'none';
+                  firmaImg.src = '';
+                  firmaEmpty.style.display = 'block';
+              }
+              
+              // Rellenar foto evidencia
+              if (cab.foto && cab.foto.length > 50) {
+                  photoImg.src = cab.foto;
+                  photoImg.style.display = 'inline-block';
+                  photoEmpty.style.display = 'none';
+              } else {
+                  photoImg.style.display = 'none';
+                  photoImg.src = '';
+                  photoEmpty.style.display = 'block';
+              }
+              
+          } else {
+              document.getElementById('modal-hist-title').textContent = 'Error';
+              document.getElementById('modal-hist-items-body').innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#b02500; font-weight:bold;">${data.message}</td></tr>`;
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          document.getElementById('modal-hist-title').textContent = 'Error de Servidor';
+          document.getElementById('modal-hist-items-body').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#b02500; font-weight:bold;">No se pudo conectar con el servidor.</td></tr>';
+      });
+  }
+
+  function closeHistoryDetailModal() {
+      document.getElementById('history-detail-modal').classList.remove('active');
   }
 
   // Inicialización del Mapa Leaflet para Paradas Activas
