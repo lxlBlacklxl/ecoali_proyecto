@@ -1126,6 +1126,19 @@ while ($row = $resHist->fetch_assoc()) {
         </button>
       </div>
 
+      <!-- Evidencia de Foto (Requisito #21) -->
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label style="font-size: 11px; font-weight: 800; color: var(--text-medium); text-transform: uppercase; align-self: flex-start;">Evidencia Fotográfica del Envío</label>
+        <div style="border: 2px dashed var(--glass-border); border-radius: 16px; padding: 20px; text-align: center; background: #fff; position: relative; cursor: pointer;">
+          <input type="file" id="delivery-photo" accept="image/*" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="previewDeliveryPhoto(event)">
+          <div id="photo-preview-placeholder" style="color: var(--text-medium); font-size: 13px; font-weight: 600;">
+            <span style="font-size: 32px; display: block; margin-bottom: 8px;">📸</span>
+            Tomar Foto o Seleccionar Imagen
+          </div>
+          <img id="photo-preview-img" style="display: none; max-width: 100%; max-height: 150px; border-radius: 12px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" alt="Previsualización">
+        </div>
+      </div>
+
       <div class="form-group" style="margin-bottom: 20px;">
         <label>Ubicación de Despacho (GPS)</label>
         <div style="display:flex; gap:10px;">
@@ -1296,6 +1309,23 @@ while ($row = $resHist->fetch_assoc()) {
       }
   }
 
+  let capturedPhotoBase64 = "";
+
+  function previewDeliveryPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          capturedPhotoBase64 = e.target.result;
+          document.getElementById('photo-preview-placeholder').style.display = 'none';
+          const img = document.getElementById('photo-preview-img');
+          img.src = capturedPhotoBase64;
+          img.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+  }
+
   // Abrir y Cerrar Modal
   function openManageStopModal(pedidoId, clienteNombre, direccion) {
       activePedidoId = pedidoId;
@@ -1306,6 +1336,14 @@ while ($row = $resHist->fetch_assoc()) {
       clearSignature();
       document.getElementById('delivery-gps').value = "";
       document.getElementById('incident-desc').value = "";
+      
+      // Limpiar y resetear foto de evidencia
+      capturedPhotoBase64 = "";
+      document.getElementById('delivery-photo').value = "";
+      document.getElementById('photo-preview-placeholder').style.display = 'block';
+      document.getElementById('photo-preview-img').style.display = 'none';
+      document.getElementById('photo-preview-img').src = "";
+      
       switchModalTab('complete');
       
       // Auto-geolocalizar
@@ -1334,12 +1372,13 @@ while ($row = $resHist->fetch_assoc()) {
   // --- SUBMISSION LOGIC ---
 
   // Actualizar estado simple (Recoger y Salir)
-  function updateDeliveryStatus(id, newStatus, coords = "", sign = "") {
+  function updateDeliveryStatus(id, newStatus, coords = "", sign = "", photo = "") {
       const payload = {
           pedido_id: id,
           nuevo_estado: newStatus,
           coordenadas: coords,
-          firma: sign
+          firma: sign,
+          foto: photo
       };
 
       fetch('forms/actualizar_estado_entrega.php', {
@@ -1379,10 +1418,16 @@ while ($row = $resHist->fetch_assoc()) {
           return;
       }
 
+      // Validar que se haya subido la foto física
+      if (!capturedPhotoBase64) {
+          showAlertModal('Foto de Evidencia Obligatoria', 'Debes capturar una fotografía de la entrega física como evidencia de control y entrega.', '⚠️', 'var(--primary)');
+          return;
+      }
+
       const signBase64 = canvas.toDataURL();
       const gps = document.getElementById('delivery-gps').value || "Lat: 37.3891, Lng: -5.9845";
 
-      updateDeliveryStatus(activePedidoId, 'entregado', gps, signBase64);
+      updateDeliveryStatus(activePedidoId, 'entregado', gps, signBase64, capturedPhotoBase64);
   }
 
   // Registrar Incidencia / Cancelar

@@ -125,6 +125,9 @@ $countList = $resultList ? $resultList->num_rows : 0;
   <!-- Header -->
   <div class="header-topappbar">
     <div class="div-4"><div class="text-26">Cartera de Clientes y Consumo</div></div>
+    <button class="button-2" onclick="abrirCrearCliente()" style="background: #176a21;">
+      <div class="text-3">Agregar Cliente</div>
+    </button>
   </div>
 
   <div class="main-content">
@@ -230,11 +233,15 @@ $countList = $resultList ? $resultList->num_rows : 0;
                 
                 <button class="action-btn" title="Historial de Consumo" onclick="abrirConsumo(<?php echo $row['id']; ?>, '<?php echo addslashes(($row['nombre'] ?? 'Cliente') . ' ' . $row['apellido']); ?>')" style="background:#176a21; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">📊</button>
                 
+                <button class="action-btn" title="Editar Cliente" onclick="abrirEditarCliente(<?php echo $row['id']; ?>)" style="background:#ff8a00; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">✏️</button>
+                
                 <?php if ($activo === 1): ?>
-                    <button class="action-btn" title="Desactivar Cliente" onclick="abrirConfirmarEstado(<?php echo $row['id']; ?>, 0, '<?php echo addslashes($row['nombre']); ?>')" style="background:#b02500; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">🚫</button>
+                    <button class="action-btn" title="Desactivar Cliente" onclick="abrirConfirmarEstado(<?php echo $row['id']; ?>, 0, '<?php echo addslashes($row['nombre']); ?>')" style="background:#804000; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">🚫</button>
                 <?php else: ?>
                     <button class="action-btn" title="Activar Cliente" onclick="abrirConfirmarEstado(<?php echo $row['id']; ?>, 1, '<?php echo addslashes($row['nombre']); ?>')" style="background:#d5a470; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">✓</button>
                 <?php endif; ?>
+
+                <button class="action-btn" title="Eliminar Cliente" onclick="abrirEliminarCliente(<?php echo $row['id']; ?>, '<?php echo addslashes(($row['nombre'] ?? '') . ' ' . $row['apellido']); ?>')" style="background:#b02500; color:#fff; border:none; width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;">🗑️</button>
                 
               </div>
             </div>
@@ -313,7 +320,162 @@ $countList = $resultList ? $resultList->num_rows : 0;
   </div>
 </div>
 
+<!-- Modal Crear Cliente -->
+<div class="modal-overlay" id="modalCrearCliente">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color: #176a21;">Agregar Nuevo Cliente</div>
+      <button class="modal-close" onclick="cerrarModal('modalCrearCliente')">×</button>
+    </div>
+    <form action="forms/clientes_acciones.php" method="POST">
+      <input type="hidden" name="accion" value="crear">
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; margin-bottom: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">USUARIO *</label>
+          <input type="text" name="usuario" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">CONTRASEÑA *</label>
+          <input type="password" name="password" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">NOMBRE *</label>
+          <input type="text" name="nombre" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">APELLIDO</label>
+          <input type="text" name="apellido" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">CORREO ELECTRÓNICO *</label>
+          <input type="email" name="email" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">DIRECCIÓN DE ENTREGA</label>
+          <input type="text" name="direccion" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">TELÉFONO</label>
+          <input type="text" name="telefono" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="cerrarModal('modalCrearCliente')">Cancelar</button>
+        <button type="submit" class="btn-submit" style="background:#176a21;">Registrar Cliente</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Cliente -->
+<div class="modal-overlay" id="modalEditarCliente">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color: #ff8a00;">Editar Cliente</div>
+      <button class="modal-close" onclick="cerrarModal('modalEditarCliente')">×</button>
+    </div>
+    <form action="forms/clientes_acciones.php" method="POST">
+      <input type="hidden" name="accion" value="editar">
+      <input type="hidden" name="id" id="edit_id">
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; margin-bottom: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">USUARIO *</label>
+          <input type="text" name="usuario" id="edit_usuario" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">NUEVA CONTRASEÑA (OPCIONAL)</label>
+          <input type="password" name="password" placeholder="Dejar en blanco para no cambiar" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">NOMBRE *</label>
+          <input type="text" name="nombre" id="edit_nombre" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">APELLIDO</label>
+          <input type="text" name="apellido" id="edit_apellido" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">CORREO ELECTRÓNICO *</label>
+          <input type="email" name="email" id="edit_email" required style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">DIRECCIÓN DE ENTREGA</label>
+          <input type="text" name="direccion" id="edit_direccion" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1;">
+          <label style="font-size: 11px; font-weight:700; color:#7a5427;">TELÉFONO</label>
+          <input type="text" name="telefono" id="edit_telefono" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(213, 164, 112, 0.3); outline:none;">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="cerrarModal('modalEditarCliente')">Cancelar</button>
+        <button type="submit" class="btn-submit" style="background:#ff8a00;">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Eliminar Cliente -->
+<div class="modal-overlay" id="modalEliminarCliente">
+  <div class="modal-container" style="max-width: 440px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color: #b02500;">Eliminar Cliente Permanente</div>
+      <button class="modal-close" onclick="cerrarModal('modalEliminarCliente')">×</button>
+    </div>
+    <form action="forms/clientes_acciones.php" method="POST">
+      <input type="hidden" name="accion" value="eliminar">
+      <input type="hidden" name="id" id="eliminar_id">
+      
+      <p style="color: #7a5427; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+        ¿Estás absolutamente seguro de que deseas <strong>ELIMINAR PERMANENTEMENTE</strong> al cliente <strong id="eliminar_nombre" style="color:#b02500;"></strong>?<br>
+        <span style="font-size: 11px; color:#b02500; font-weight:700;">⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER Y ELIMINARÁ TODOS SUS PEDIDOS.</span>
+      </p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="cerrarModal('modalEliminarCliente')">Cancelar</button>
+        <button type="submit" class="btn-submit" style="background:#b02500;">Eliminar Permanentemente</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+function abrirCrearCliente() {
+    document.getElementById('modalCrearCliente').classList.add('active');
+}
+
+function abrirEditarCliente(id) {
+    fetch('forms/clientes_acciones.php?accion=obtener&id=' + id)
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === 'success') {
+                document.getElementById('edit_id').value = res.data.id;
+                document.getElementById('edit_usuario').value = res.data.usuario;
+                document.getElementById('edit_nombre').value = res.data.nombre;
+                document.getElementById('edit_apellido').value = res.data.apellido;
+                document.getElementById('edit_email').value = res.data.email;
+                document.getElementById('edit_direccion').value = res.data.direccion;
+                document.getElementById('edit_telefono').value = res.data.telefono;
+                document.getElementById('modalEditarCliente').classList.add('active');
+            } else {
+                alert('Error al obtener datos del cliente: ' + res.message);
+            }
+        })
+        .catch(err => {
+            alert('Error de conexión con el servidor.');
+        });
+}
+
+function abrirEliminarCliente(id, nombre) {
+    document.getElementById('eliminar_id').value = id;
+    document.getElementById('eliminar_nombre').textContent = nombre;
+    document.getElementById('modalEliminarCliente').classList.add('active');
+}
+
 function abrirConsumo(id, nombre) {
     document.getElementById('consumo_nombre').textContent = nombre;
     const cuerpo = document.getElementById('consumo_cuerpo');

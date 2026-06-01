@@ -359,11 +359,23 @@ $produccion_mensual = [
 
 <script>
 function simularExportacion(formato) {
-    alert('¡Excelente! El reporte de ' + '<?php echo $tipo_reporte; ?>' + ' en formato ' + formato.toUpperCase() + ' ha comenzado a compilarse.\nSe descargará automáticamente en tu dispositivo en unos segundos.');
+    const tipo = '<?php echo $tipo_reporte; ?>';
+    const inicio = '<?php echo $fecha_inicio; ?>';
+    const fin = '<?php echo $fecha_fin; ?>';
+    window.location.href = `forms/exportar_reporte.php?formato=${formato}&tipo_reporte=${tipo}&fecha_inicio=${inicio}&fecha_fin=${fin}`;
 }
 
 function simularDescarga(nombreArchivo) {
-    alert('Iniciando descarga segura de: ' + nombreArchivo + '\nConsistencia y trazabilidad verificada por ECOALI.');
+    let tipo = 'ventas';
+    let formato = 'pdf';
+    if (nombreArchivo.includes('.xlsx')) {
+        tipo = 'inventario';
+        formato = 'excel';
+    } else if (nombreArchivo.includes('.csv')) {
+        tipo = 'clientes';
+        formato = 'excel';
+    }
+    window.location.href = `forms/exportar_reporte.php?formato=${formato}&tipo_reporte=${tipo}`;
 }
 </script>
 </body>

@@ -800,7 +800,8 @@ if (!empty($pedidos)) {
                   <span class="order-total" style="font-size:18px; font-weight:800; color:var(--secondary);">$<?php echo number_format($ped["total"], 2); ?></span>
                   <small style="display:block; font-size:10px; color:var(--text-medium); font-weight:700;"><?php echo strtoupper($ped["metodo_pago"] ?? "EFECTIVO"); ?> - <?php echo strtoupper($ped["pago_estado"] ?? "PENDIENTE"); ?></small>
                 </div>
-                <div style="display:flex; gap:10px;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <a href="comprobante.php?id=<?php echo $ped['id']; ?>" target="_blank" style="background:#176a21; color:white; border:none; padding:10px 18px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">Factura 📄</a>
                   <button class="order-btn" onclick="toggleOrderDetails(<?php echo $ped['id']; ?>)" style="background:white; border:1px solid var(--glass-border); color:var(--text-medium); padding:10px 18px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">Detalles</button>
                   <?php if ($estado === "pendiente"): ?>
                     <button class="order-btn cancel" id="cancel-btn-<?php echo $ped['id']; ?>" onclick="confirmCancelOrder(<?php echo $ped['id']; ?>)" style="border:1px solid rgba(176,37,0,0.2); background:rgba(176,37,0,0.03); color:#b02500; padding:10px 18px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">Cancelar</button>
@@ -979,11 +980,31 @@ if (!empty($pedidos)) {
     <!-- Cargado por JS -->
   </div>
 
-  <div style="padding:24px; background:white; border-top:1px solid var(--glass-border); display:flex; flex-direction:column; gap:16px;">
+  <div style="padding:24px; background:white; border-top:1px solid var(--glass-border); display:flex; flex-direction:column; gap:12px;">
+    <!-- Entrada de Cupón de Fidelización -->
+    <div style="display:flex; gap:8px; margin-bottom:4px;">
+      <input type="text" id="cupon-input" style="flex-grow:1; height:38px; border-radius:8px; border:1px solid var(--glass-border); padding:0 10px; font-size:11px; font-weight:700; text-transform:uppercase;" placeholder="CÓDIGO DE CUPÓN">
+      <button onclick="aplicarCuponJS()" style="background:var(--secondary); color:white; border:none; padding:0 14px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">Aplicar</button>
+    </div>
+    <div id="cupon-status-msg" style="font-size:11px; font-weight:800; display:none; padding:6px 10px; border-radius:6px; text-align:center;"></div>
+
     <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--text-medium);">
       <span>Subtotal</span>
       <span id="cart-subtotal">$0.00</span>
     </div>
+    
+    <!-- Fila Descuento Promoción Automática -->
+    <div id="cart-promo-row" style="display:none; justify-content:space-between; font-size:14px; font-weight:700; color:#176a21;">
+      <span>Promo Compra Mínima (5%)</span>
+      <span id="cart-promo-val">-$0.00</span>
+    </div>
+
+    <!-- Fila Descuento Cupón Fidelización -->
+    <div id="cart-discount-row" style="display:none; justify-content:space-between; font-size:14px; font-weight:700; color:#b02500;">
+      <span>Descuento Cupón (<span id="cart-discount-name"></span>)</span>
+      <span id="cart-discount-val">-$0.00</span>
+    </div>
+
     <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:var(--text-medium);">
       <span>Envío</span>
       <span style="color:var(--secondary); font-weight:800;">GRATIS</span>
@@ -1514,6 +1535,49 @@ if (!empty($pedidos)) {
       localStorage.setItem('ecoali_cart_' + <?php echo $cliente_id; ?>, JSON.stringify(ecoaliCart));
   }
 
+  let aplicadoCupon = null;
+
+  function aplicarCuponJS() {
+      const input = document.getElementById('cupon-input');
+      const codigo = input.value.trim().toUpperCase();
+      const statusMsg = document.getElementById('cupon-status-msg');
+      
+      if (codigo === '') {
+          statusMsg.style.display = 'block';
+          statusMsg.style.background = 'rgba(176, 37, 0, 0.12)';
+          statusMsg.style.color = '#b02500';
+          statusMsg.textContent = 'Ingresa un código de cupón.';
+          return;
+      }
+      
+      fetch('forms/validar_cupon.php?codigo=' + encodeURIComponent(codigo))
+          .then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  aplicadoCupon = data.data;
+                  statusMsg.style.display = 'block';
+                  statusMsg.style.background = 'rgba(23, 106, 33, 0.12)';
+                  statusMsg.style.color = '#176a21';
+                  statusMsg.textContent = data.message;
+                  updateCartUI();
+              } else {
+                  aplicadoCupon = null;
+                  statusMsg.style.display = 'block';
+                  statusMsg.style.background = 'rgba(176, 37, 0, 0.12)';
+                  statusMsg.style.color = '#b02500';
+                  statusMsg.textContent = data.message;
+                  updateCartUI();
+              }
+          })
+          .catch(err => {
+              console.error(err);
+              statusMsg.style.display = 'block';
+              statusMsg.style.background = 'rgba(176, 37, 0, 0.12)';
+              statusMsg.style.color = '#b02500';
+              statusMsg.textContent = 'Error al conectar con el servidor.';
+          });
+  }
+
   function updateCartUI() {
       const container = document.getElementById('cart-items-container');
       const counter = document.getElementById('cart-counter');
@@ -1553,9 +1617,50 @@ if (!empty($pedidos)) {
           });
       }
 
+      // Descuento automático por compra mínima (>= $50)
+      let autoPromoDiscount = 0.0;
+      const promoRow = document.getElementById('cart-promo-row');
+      const promoValEl = document.getElementById('cart-promo-val');
+      
+      if (subtotal >= 50.0) {
+          autoPromoDiscount = subtotal * 0.05; // 5% de descuento
+          if (promoRow && promoValEl) {
+              promoRow.style.display = 'flex';
+              promoValEl.textContent = '-$' + autoPromoDiscount.toFixed(2);
+          }
+      } else {
+          if (promoRow) promoRow.style.display = 'none';
+      }
+
+      // Descuento por Cupón de Fidelización
+      let couponDiscount = 0.0;
+      const discRow = document.getElementById('cart-discount-row');
+      const discName = document.getElementById('cart-discount-name');
+      const discVal = document.getElementById('cart-discount-val');
+      
+      if (aplicadoCupon) {
+          if (aplicadoCupon.tipo === 'porcentaje') {
+              couponDiscount = subtotal * (aplicadoCupon.descuento / 100);
+          } else {
+              couponDiscount = aplicadoCupon.descuento;
+          }
+          if (couponDiscount > subtotal - autoPromoDiscount) {
+              couponDiscount = subtotal - autoPromoDiscount;
+          }
+          if (discRow && discName && discVal) {
+              discRow.style.display = 'flex';
+              discName.textContent = aplicadoCupon.codigo;
+              discVal.textContent = '-$' + couponDiscount.toFixed(2);
+          }
+      } else {
+          if (discRow) discRow.style.display = 'none';
+      }
+
+      const total = Math.max(0.0, subtotal - autoPromoDiscount - couponDiscount);
+
       counter.textContent = totalQty;
       subtotalEl.textContent = '$' + subtotal.toFixed(2);
-      totalEl.textContent = '$' + subtotal.toFixed(2);
+      totalEl.textContent = '$' + total.toFixed(2);
   }
 
   // checkout Wizard
@@ -1706,7 +1811,8 @@ if (!empty($pedidos)) {
           referido_por: ref,
           metodo_pago: metodo,
           pago_estado: estado,
-          carrito: ecoaliCart
+          carrito: ecoaliCart,
+          cupon_codigo: aplicadoCupon ? aplicadoCupon.codigo : null
       };
 
       fetch('forms/procesar_pedido.php', {

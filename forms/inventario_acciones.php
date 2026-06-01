@@ -26,13 +26,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             exit;
         }
 
+        // Regla de Negocio #6 preventiva: Caducidad automática si excede 3 días
+        if (!empty($fecha_postura)) {
+            $antiguedad = (time() - strtotime($fecha_postura)) / (60 * 60 * 24);
+            if ($antiguedad > 3) {
+                $estado = 'caducado';
+            }
+        }
+
         $sql = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad, fecha_postura, fecha_caducidad, estado) VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("iisssss", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_postura, $fecha_caducidad, $estado);
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "Lote agregado al inventario correctamente.";
-            registrar_bitacora("Lote agregado", "Inventario", "Se agregó el lote #$codigo_lote con $cantidad huevos.");
+            if ($estado === 'caducado') {
+                $_SESSION["mensaje_exito"] .= " Nota: Se guardó automáticamente como CADUCADO por antigüedad superior a 3 días.";
+            }
+            auditar_accion("Inventario", "Lote creado", "Se agregó el lote #$codigo_lote con $cantidad huevos. Estado: " . strtoupper($estado));
         } else {
             $_SESSION["mensaje_error"] = "Error al agregar lote: " . $conn->error;
         }
@@ -55,13 +66,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             exit;
         }
 
+        // Regla de Negocio #6 preventiva: Caducidad automática si excede 3 días
+        if (!empty($fecha_postura)) {
+            $antiguedad = (time() - strtotime($fecha_postura)) / (60 * 60 * 24);
+            if ($antiguedad > 3) {
+                $estado = 'caducado';
+            }
+        }
+
         $sql = "UPDATE inventario_huevos SET proveedor_id = ?, producto_id = ?, codigo_lote = ?, cantidad = ?, fecha_postura = ?, fecha_caducidad = ?, estado = ? WHERE id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("iisssssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_postura, $fecha_caducidad, $estado, $id);
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "Lote de inventario actualizado correctamente.";
-            registrar_bitacora("Lote editado", "Inventario", "Se actualizó el lote #$codigo_lote. Nueva cantidad: $cantidad unidades.");
+            if ($estado === 'caducado') {
+                $_SESSION["mensaje_exito"] .= " Nota: Se marcó automáticamente como CADUCADO por antigüedad superior a 3 días.";
+            }
+            auditar_accion("Inventario", "Lote editado", "Se actualizó el lote #$codigo_lote. Nueva cantidad: $cantidad unidades. Estado: " . strtoupper($estado));
         } else {
             $_SESSION["mensaje_error"] = "Error al actualizar lote: " . $conn->error;
         }
@@ -90,7 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "Lote eliminado correctamente.";
-            registrar_bitacora("Lote eliminado", "Inventario", "Se eliminó de forma permanente el lote #$codigo_lote (ID: $id).");
+            auditar_accion("Inventario", "Lote eliminado", "Se eliminó de forma permanente el lote #$codigo_lote (ID: $id).");
         } else {
             $_SESSION["mensaje_error"] = "Error al eliminar lote: " . $conn->error;
         }
@@ -118,7 +140,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "El lote #" . $codigo_lote . " ha sido bloqueado y marcado como caducado.";
-            registrar_bitacora("Lote caducado", "Inventario", "Se inhabilitó/bloqueó preventivamente el lote caducado #$codigo_lote.");
+            auditar_accion("Inventario", "Lote bloqueado", "Se inhabilitó/bloqueó preventivamente el lote caducado #$codigo_lote.");
         } else {
             $_SESSION["mensaje_error"] = "Error al bloquear lote: " . $conn->error;
         }

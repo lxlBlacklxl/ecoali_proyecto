@@ -141,10 +141,48 @@ try {
         }
     }
 
-    // 3. REGISTRAR CABECERA DEL PEDIDO (CON PAGO)
-    $sqlInsertPedido = "INSERT INTO pedidos (cliente_id, repartidor_id, total, estado, fecha_pedido, metodo_pago, pago_estado) VALUES (?, NULL, ?, 'pendiente', NOW(), ?, ?)";
+    // 2.2 CALCULAR DESCUENTOS Y PROMOCIONES AUTOMÁTICAS (Fase 3)
+    $subtotal_bruto = $total_pedido;
+    $auto_promo_descuento = 0.0;
+    if ($subtotal_bruto >= 50.0) {
+        $auto_promo_descuento = round($subtotal_bruto * 0.05, 2);
+    }
+
+    $cupon_codigo = trim($input["cupon_codigo"] ?? "");
+    $cupon_descuento = 0.0;
+    if (!empty($cupon_codigo)) {
+        $stmtCupon = $conn->prepare("SELECT tipo, descuento, activo FROM cupones WHERE codigo = ? AND activo = 1");
+        if ($stmtCupon) {
+            $stmtCupon->bind_param("s", $cupon_codigo);
+            $stmtCupon->execute();
+            $resCupon = $stmtCupon->get_result();
+            if ($resCupon->num_rows > 0) {
+                $cupon = $resCupon->fetch_assoc();
+                if ($cupon["tipo"] === 'porcentaje') {
+                    $cupon_descuento = round($subtotal_bruto * ($cupon["descuento"] / 100), 2);
+                } else {
+                    $cupon_descuento = (float)$cupon["descuento"];
+                }
+            }
+            $stmtCupon->close();
+        }
+    }
+
+    $descuento_total = $auto_promo_descuento + $cupon_descuento;
+    if ($descuento_total > $subtotal_bruto) {
+        $descuento_total = $subtotal_bruto;
+    }
+
+    $total_final = $subtotal_bruto - $descuento_total;
+
+    // Calcular IVA del 16% (incluido en el total)
+    $subtotal_base = round($total_final / 1.16, 2);
+    $iva_calculado = round($total_final - $subtotal_base, 2);
+
+    // 3. REGISTRAR CABECERA DEL PEDIDO (CON PAGO, DESCUENTOS E IVA)
+    $sqlInsertPedido = "INSERT INTO pedidos (cliente_id, repartidor_id, total, estado, fecha_pedido, metodo_pago, pago_estado, descuento, cupon_codigo, subtotal, iva) VALUES (?, NULL, ?, 'pendiente', NOW(), ?, ?, ?, ?, ?, ?)";
     $stmtPedido = $conn->prepare($sqlInsertPedido);
-    $stmtPedido->bind_param("idss", $cliente_id, $total_pedido, $metodo_pago, $pago_estado);
+    $stmtPedido->bind_param("idssdsdd", $cliente_id, $total_final, $metodo_pago, $pago_estado, $descuento_total, $cupon_codigo, $subtotal_base, $iva_calculado);
     if (!$stmtPedido->execute()) {
         throw new Exception("Error al registrar la cabecera de la orden: " . $conn->error);
     }
@@ -171,7 +209,7 @@ try {
 
         if ($resRef->num_rows > 0) {
             $beneficiado_id = $resRef->fetch_assoc()["id"];
-            $comision_monto = round($total_pedido * 0.10, 2);
+            $comision_monto = round($total_final * 0.10, 2);
 
             if ($comision_monto > 0) {
                 $sqlInsertRegalia = "INSERT INTO regalias (usuario_beneficiado_id, usuario_referido_id, pedido_id, nivel, monto, estado, fecha) VALUES (?, ?, ?, 1, ?, 'pendiente', NOW())";
@@ -191,7 +229,7 @@ try {
 
     // 7. REGISTRAR LOG EN LA BITÁCORA DEL SISTEMA
     $nCompleto = ($_SESSION["nombre"] ?? "Cliente") . " " . ($_SESSION["apellido"] ?? "");
-    registrar_bitacora("Pedido creado", "Logística", "El cliente '$nCompleto' creó el pedido #PED-" . str_pad($pedido_id, 3, "0", STR_PAD_LEFT) . " pagado vía " . strtoupper($metodo_pago) . " por un total de $$total_pedido.");
+    registrar_bitacora("Pedido creado", "Logística", "El cliente '$nCompleto' creó el pedido #PED-" . str_pad($pedido_id, 3, "0", STR_PAD_LEFT) . " pagado vía " . strtoupper($metodo_pago) . " por un total de $$total_final.");
 
     // Confirmar transacción
     $conn->commit();
@@ -200,7 +238,7 @@ try {
         "status" => "success",
         "message" => "¡Pedido e inventario procesados con éxito!",
         "pedido_id" => $pedido_id,
-        "total" => $total_pedido
+        "total" => $total_final
     ]);
 
 } catch (Exception $e) {

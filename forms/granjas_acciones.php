@@ -165,6 +165,60 @@ switch ($accion) {
         }
         break;
 
+    case "abastecer_cartones":
+        $granja_id = (int)($input["id"] ?? 0);
+        $cantidad = (int)($input["cantidad"] ?? 0);
+
+        if ($granja_id <= 0 || $cantidad <= 0) {
+            echo json_encode(["status" => "error", "message" => "Parámetros de reabastecimiento inválidos."]);
+            exit;
+        }
+
+        $conn->begin_transaction();
+        try {
+            // Validar propiedad de la granja antes de abastecer
+            $stmtVal = $conn->prepare("SELECT nombre, stock_cartones FROM granjas WHERE id = ? AND proveedor_id = ?");
+            $stmtVal->bind_param("ii", $granja_id, $proveedor_id);
+            $stmtVal->execute();
+            $resVal = $stmtVal->get_result();
+
+            if ($resVal->num_rows === 0) {
+                throw new Exception("No tienes autorización para abastecer esta granja o no existe.");
+            }
+
+            $granja_data = $resVal->fetch_assoc();
+            $nombre_granja = $granja_data["nombre"];
+            $stock_actual = (int)$granja_data["stock_cartones"];
+            $nuevo_stock = $stock_actual + $cantidad;
+
+            // Actualizar stock de cartones
+            $stmtUp = $conn->prepare("UPDATE granjas SET stock_cartones = ? WHERE id = ?");
+            $stmtUp->bind_param("ii", $nuevo_stock, $granja_id);
+            
+            if (!$stmtUp->execute()) {
+                throw new Exception("Error al actualizar el stock de cartones en la base de datos.");
+            }
+
+            // Registrar en bitácora
+            $nCompleto = ($_SESSION["nombre"] ?? "Proveedor") . " (" . $nombre_empresa . ")";
+            registrar_bitacora(
+                "Insumos reabastecidos",
+                "Inventario",
+                "El proveedor '$nCompleto' reabasteció con $cantidad cartones de empaque la granja '$nombre_granja' (Nuevo stock: $nuevo_stock uds)."
+            );
+
+            $conn->commit();
+            echo json_encode([
+                "status" => "success",
+                "message" => "¡Se han agregado con éxito $cantidad cartones a la granja '$nombre_granja'! (Total: $nuevo_stock)"
+            ]);
+
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        }
+        break;
+
     default:
         echo json_encode(["status" => "error", "message" => "Acción no reconocida."]);
         break;

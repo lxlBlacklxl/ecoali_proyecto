@@ -96,6 +96,92 @@ $conn->query("CREATE TABLE IF NOT EXISTS `incidencias` (
     `fecha_reporte` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
+// 9.4 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE CUPONES SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `cupones` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `codigo` VARCHAR(50) UNIQUE NOT NULL,
+    `tipo` ENUM('porcentaje', 'fijo') NOT NULL,
+    `descuento` DECIMAL(10,2) NOT NULL,
+    `activo` TINYINT NOT NULL DEFAULT 1
+)");
+
+// 9.5 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE PROMOCIONES SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `promociones` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `nombre` VARCHAR(100) NOT NULL,
+    `tipo` ENUM('porcentaje', 'fijo') NOT NULL,
+    `descuento` DECIMAL(10,2) NOT NULL,
+    `compra_minima` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `activo` TINYINT NOT NULL DEFAULT 1
+)");
+
+// 9.6 MIGRACIÓN AUTOMÁTICA: AGREGAR stock_cartones A granjas SI NO EXISTE
+$resColCarton = $conn->query("SHOW COLUMNS FROM `granjas` LIKE 'stock_cartones'");
+if ($resColCarton && $resColCarton->num_rows === 0) {
+    $conn->query("ALTER TABLE `granjas` ADD COLUMN `stock_cartones` INT NOT NULL DEFAULT 120");
+}
+
+// 9.7 MIGRACIÓN AUTOMÁTICA: AGREGAR COLUMNAS DE DESCUENTO A PEDIDOS SI NO EXISTEN
+$resDescuento = $conn->query("SHOW COLUMNS FROM `pedidos` LIKE 'descuento'");
+if ($resDescuento && $resDescuento->num_rows === 0) {
+    $conn->query("ALTER TABLE `pedidos` 
+                  ADD COLUMN `descuento` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                  ADD COLUMN `cupon_codigo` VARCHAR(50) NULL");
+}
+
+$resIva = $conn->query("SHOW COLUMNS FROM `pedidos` LIKE 'iva'");
+if ($resIva && $resIva->num_rows === 0) {
+    $conn->query("ALTER TABLE `pedidos` 
+                  ADD COLUMN `subtotal` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                  ADD COLUMN `iva` DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+}
+
+// 9.8 MIGRACIÓN AUTOMÁTICA: INSERTAR CUPONES Y PROMOCIONES DE MUESTRA SI LA TABLA ESTÁ VACÍA
+$resCuponCheck = $conn->query("SELECT COUNT(*) FROM cupones");
+if ($resCuponCheck && (int)$resCuponCheck->fetch_row()[0] === 0) {
+    $conn->query("INSERT INTO cupones (codigo, tipo, descuento, activo) VALUES 
+        ('ECO20', 'porcentaje', 20.00, 1),
+        ('FRESCO10', 'porcentaje', 10.00, 1),
+        ('AHORRO5', 'fijo', 5.00, 1)
+    ");
+}
+
+$resPromoCheck = $conn->query("SELECT COUNT(*) FROM promociones");
+if ($resPromoCheck && (int)$resPromoCheck->fetch_row()[0] === 0) {
+    $conn->query("INSERT INTO promociones (nombre, tipo, descuento, compra_minima, activo) VALUES 
+        ('Descuento Verde', 'porcentaje', 10.00, 50.00, 1),
+        ('Mega Ahorro', 'fijo', 15.00, 100.00, 1)
+    ");
+}
+
+// 9.9 CADUCIDAD AUTOMÁTICA DE LOTES (REGLA DE NEGOCIO #6):
+// Lotes de postura que excedan los 3 días de antigüedad a partir de hoy son marcados como 'caducado'.
+// Para evitar ciclos infinitos, solo buscamos lotes 'disponible' o 'bajo_stock' con fecha de postura > 3 días.
+$stmtCaducador = $conn->query("SELECT id, codigo_lote FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND DATEDIFF(CURDATE(), fecha_postura) > 3");
+if ($stmtCaducador && $stmtCaducador->num_rows > 0) {
+    while ($loteCaducado = $stmtCaducador->fetch_assoc()) {
+        $lote_id = $loteCaducado["id"];
+        $lote_code = $loteCaducado["codigo_lote"];
+        $conn->query("UPDATE inventario_huevos SET estado = 'caducado' WHERE id = $lote_id");
+        // Registrar auditoría automática en bitácora
+        registrar_bitacora(
+            "Lote caducado automáticamente", 
+            "Inventario", 
+            "El sistema detectó que el lote '$lote_code' superó los 3 días de antigüedad desde su postura y fue bloqueado automáticamente para la venta."
+        );
+    }
+}
+
+/**
+ * Función global de captura de auditoría para el Sistema de Auditoría y Bitácoras (Requisito #25).
+ * Registra de manera unificada cualquier acción de precio, cancelaciones y movimientos de inventario.
+ */
+if (!function_exists('auditar_accion')) {
+    function auditar_accion($modulo, $accion, $descripcion) {
+        registrar_bitacora($accion, $modulo, $descripcion);
+    }
+}
+
 // 10. FUNCIÓN AUXILIAR DE REGISTRO EN BITÁCORA (AUDITORÍA INTERNA)
 if (!function_exists('registrar_bitacora')) {
     /**

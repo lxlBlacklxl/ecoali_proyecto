@@ -875,6 +875,7 @@ if ($proveedor_id > 0) {
       <!-- Panel de Alertas Críticas (Requirement 3) -->
       <?php
       $lotesCriticos = [];
+      $granjasBajoInsumo = [];
       if ($proveedor_id > 0) {
           // Lotes bajo stock
           $stmtCritLow = $conn->prepare("SELECT codigo_lote, cantidad, pr.nombre AS producto_nombre FROM inventario_huevos i INNER JOIN productos pr ON i.producto_id = pr.id WHERE i.proveedor_id = ? AND i.cantidad > 0 AND (i.estado = 'bajo_stock' OR i.cantidad < 100) ORDER BY i.cantidad ASC LIMIT 5");
@@ -885,6 +886,7 @@ if ($proveedor_id > 0) {
               $row["motivo"] = "bajo_stock";
               $lotesCriticos[] = $row;
           }
+          $stmtCritLow->close();
 
           // Lotes próximos a caducar
           $stmtCritExp = $conn->prepare("SELECT codigo_lote, cantidad, fecha_caducidad, pr.nombre AS producto_nombre FROM inventario_huevos i INNER JOIN productos pr ON i.producto_id = pr.id WHERE i.proveedor_id = ? AND i.cantidad > 0 AND i.fecha_caducidad >= ? AND i.fecha_caducidad <= ? ORDER BY i.fecha_caducidad ASC LIMIT 5");
@@ -895,14 +897,45 @@ if ($proveedor_id > 0) {
               $row["motivo"] = "cercano_caducidad";
               $lotesCriticos[] = $row;
           }
+          $stmtCritExp->close();
+
+          // Alertas de Insumos: bajo stock de cartones (< 30)
+          $stmtIns = $conn->prepare("SELECT id, nombre, identificacion, stock_cartones FROM granjas WHERE proveedor_id = ? AND stock_cartones < 30 ORDER BY stock_cartones ASC");
+          $stmtIns->bind_param("i", $proveedor_id);
+          $stmtIns->execute();
+          $resIns = $stmtIns->get_result();
+          while ($row = $resIns->fetch_assoc()) {
+              $granjasBajoInsumo[] = $row;
+          }
+          $stmtIns->close();
       }
       ?>
-      <?php if (!empty($lotesCriticos)): ?>
+      <?php if (!empty($lotesCriticos) || !empty($granjasBajoInsumo)): ?>
         <div class="card" style="border-left: 5px solid var(--primary); background: rgba(255, 138, 0, 0.02); padding: 24px 28px; margin-bottom: 30px;">
           <h3 style="margin: 0 0 15px; display: flex; align-items: center; gap: 10px; color: var(--text-dark);">
-            <span>⚠️</span> Alertas Críticas de Lotes
+            <span>⚠️</span> Alertas Críticas del Sistema (Lotes e Insumos)
           </h3>
           <div style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Alertas de Insumos (Cartones) -->
+            <?php foreach ($granjasBajoInsumo as $gbi): ?>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: white; border-radius: 12px; border: 1px solid rgba(176, 37, 0, 0.25); box-shadow: 0 2px 8px rgba(0,0,0,0.01);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 16px;">📦</span>
+                  <div>
+                    <strong style="font-size: 14px; color: #b02500;">¡Bajo stock de cartones de empaque! Granja: <?php echo htmlspecialchars($gbi["nombre"]); ?></strong>
+                    <span style="font-size: 12px; color: var(--text-medium); margin-left: 8px;">Código: <?php echo htmlspecialchars($gbi["identificacion"]); ?></span>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span class="badge-status caducado" style="font-size: 11px; margin-right:5px;">
+                    Stock: <?php echo $gbi["stock_cartones"]; ?> uds
+                  </span>
+                  <button onclick="openReplenishModal(<?php echo $gbi['id']; ?>, '<?php echo htmlspecialchars($gbi['nombre'], ENT_QUOTES); ?>')" style="background:var(--secondary); color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">Abastecer ✚</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+
+            <!-- Alertas de Lotes -->
             <?php foreach ($lotesCriticos as $lc): ?>
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: white; border-radius: 12px; border: 1px solid rgba(213, 164, 112, 0.15); box-shadow: 0 2px 8px rgba(0,0,0,0.01);">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -1083,6 +1116,15 @@ if ($proveedor_id > 0) {
                   <h4><?php echo htmlspecialchars($g["nombre"]); ?></h4>
                   <p>📍 <strong>Ubicación:</strong> <?php echo htmlspecialchars($g["ubicacion"]); ?></p>
                   <p>📅 <strong>Registrado:</strong> <?php echo date("d M Y", strtotime($g["creado_en"])); ?></p>
+                  
+                  <div style="margin-top:12px; padding:10px; background:rgba(213, 164, 112, 0.05); border-radius:10px; border:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                      <small style="font-size:9px; font-weight:800; color:var(--text-medium); display:block; text-transform:uppercase;">Stock de Cartones</small>
+                      <strong style="font-size:13px; color:<?php echo $g['stock_cartones'] < 30 ? '#b02500' : 'var(--secondary)'; ?>;"><?php echo $g['stock_cartones']; ?> uds</strong>
+                    </div>
+                    <button onclick="openReplenishModal(<?php echo $g['id']; ?>, '<?php echo htmlspecialchars($g['nombre'], ENT_QUOTES); ?>')" style="background:var(--secondary); color:white; border:none; padding:6px 10px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer;">Cargar</button>
+                  </div>
+                  
                   <button class="btn-delete-farm" onclick="deleteFarm(<?php echo $g['id']; ?>)">Eliminar Granja</button>
                 </div>
               <?php endforeach; ?>
@@ -1361,9 +1403,72 @@ if ($proveedor_id > 0) {
   </div>
 </div>
 
+<!-- Modal: Reabastecer Cartones (Requirement 7) -->
+<div class="modal-overlay" id="replenish-modal">
+  <div class="modal-container" style="max-width: 420px; text-align: left; padding: 30px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h3 style="margin:0; font-size:20px; font-weight:800; color:var(--text-dark);">Abastecer Insumos</h3>
+      <button onclick="closeReplenishModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-medium); line-height:1;">&times;</button>
+    </div>
+    <form id="replenish-form" onsubmit="submitReplenish(event)">
+      <input type="hidden" id="rep-granja-id">
+      <p style="font-size:13px; color:var(--text-medium); line-height:1.5; margin:0 0 20px;">
+        Vas a registrar un reabastecimiento de cartones de empaque para la granja: <strong id="rep-granja-nombre" style="color:var(--text-dark);">Granja</strong>.
+      </p>
+      
+      <div class="form-group" style="margin-bottom:20px; display:flex; flex-direction:column; gap:8px;">
+        <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CANTIDAD DE CARTONES A AGREGAR</label>
+        <input type="number" id="rep-cantidad" value="120" min="1" max="1000" required style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-size:14px; font-weight:600; outline:none; box-sizing:border-box; width:100%;">
+      </div>
+
+      <button type="submit" class="btn-submit" style="width:100%; height:48px; margin-top:10px;">Confirmar Reabastecimiento</button>
+    </form>
+  </div>
+</div>
+
 <script>
   // Inyección de datos de lotes y trazabilidad
   var ecoaliLotesTrace = <?php echo json_encode($traceData); ?>;
+
+  let activeReplenishFarmId = null;
+
+  function openReplenishModal(id, nombre) {
+      activeReplenishFarmId = id;
+      document.getElementById('rep-granja-id').value = id;
+      document.getElementById('rep-granja-nombre').textContent = nombre;
+      document.getElementById('rep-cantidad').value = 120;
+      document.getElementById('replenish-modal').classList.add('active');
+  }
+
+  function closeReplenishModal() {
+      document.getElementById('replenish-modal').classList.remove('active');
+      activeReplenishFarmId = null;
+  }
+
+  function submitReplenish(e) {
+      e.preventDefault();
+      const id = document.getElementById('rep-granja-id').value;
+      const cant = document.getElementById('rep-cantidad').value;
+
+      fetch('forms/granjas_acciones.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'abastecer_cartones', id: id, cantidad: cant })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.status === 'success') {
+              closeReplenishModal();
+              showAlertModal('Reabastecido', data.message, '✓', 'var(--secondary)', true);
+          } else {
+              showAlertModal('Error', data.message, '✗', '#b02500');
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          showAlertModal('Error', 'No se pudo procesar el reabastecimiento.', '✗', '#b02500');
+      });
+  }
 
   function switchTab(tabName, element) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));

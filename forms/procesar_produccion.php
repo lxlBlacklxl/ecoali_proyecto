@@ -47,14 +47,31 @@ try {
     $nombre_empresa = $provData["nombre_empresa"];
 
     // 1.2 Validar que la granja existe y pertenece al proveedor
-    $stmtGranja = $conn->prepare("SELECT nombre FROM granjas WHERE id = ? AND proveedor_id = ?");
+    $stmtGranja = $conn->prepare("SELECT nombre, stock_cartones FROM granjas WHERE id = ? AND proveedor_id = ?");
     $stmtGranja->bind_param("ii", $granja_id, $proveedor_id);
     $stmtGranja->execute();
     $resGranja = $stmtGranja->get_result();
     if ($resGranja->num_rows === 0) {
         throw new Exception("La granja de origen seleccionada no es válida o no pertenece a tu cuenta.");
     }
-    $granja_nombre = $resGranja->fetch_assoc()["nombre"];
+    $granja_data = $resGranja->fetch_assoc();
+    $granja_nombre = $granja_data["nombre"];
+    $stock_cartones = (int)$granja_data["stock_cartones"];
+
+    // Calcular cartones necesarios (1 cartón = 30 huevos)
+    $cartones_necesarios = (int)ceil($cantidad / 30);
+    if ($stock_cartones < $cartones_necesarios) {
+        throw new Exception("Insumos insuficientes: La granja '$granja_nombre' no cuenta con suficientes cartones de empaque ($stock_cartones disponibles, se requieren $cartones_necesarios para empacar $cantidad huevos). Por favor, reabastece los insumos en tu panel antes de registrar la postura.");
+    }
+
+    // Descontar cartones de empaque de la granja
+    $nuevo_stock_cartones = $stock_cartones - $cartones_necesarios;
+    $stmtDeduct = $conn->prepare("UPDATE granjas SET stock_cartones = ? WHERE id = ?");
+    $stmtDeduct->bind_param("ii", $nuevo_stock_cartones, $granja_id);
+    if (!$stmtDeduct->execute()) {
+        throw new Exception("Error al actualizar el inventario de insumos de la granja.");
+    }
+    $stmtDeduct->close();
 
     // 2. Validar que el producto existe
     $stmtProd = $conn->prepare("SELECT nombre FROM productos WHERE id = ? AND activo = 1");
