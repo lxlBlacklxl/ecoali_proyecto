@@ -1116,18 +1116,18 @@ if (!empty($pedidos)) {
       <div style="display:flex; flex-direction:column; gap:16px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN DE ENTREGA COMPLETA</label>
-          <input type="text" id="chk-direccion" value="<?php echo htmlspecialchars($direccion); ?>" required style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px;" placeholder="Calle, apto, barrio o localidad">
+          <input type="text" id="chk-direccion" value="<?php echo htmlspecialchars($direccion); ?>" required oninput="validateStep1Fields()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px;" placeholder="Calle, barrio, municipio o localidad">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:800; color:var(--text-medium);">TELÉFONO DE CONTACTO</label>
-          <input type="text" id="chk-telefono" value="<?php echo htmlspecialchars($telefono); ?>" required style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px;">
+          <input type="text" id="chk-telefono" value="<?php echo htmlspecialchars($telefono); ?>" required oninput="validateStep1Fields()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px;">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CÓDIGO DE REFERIDO (OPCIONAL)</label>
           <input type="text" id="chk-referido" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; text-transform:uppercase;" placeholder="Ej: DIEGO">
         </div>
 
-        <button onclick="goToCheckoutStep(2)" style="background:var(--primary); color:white; border:none; height:48px; border-radius:12px; font-weight:800; cursor:pointer; margin-top:10px;">
+        <button id="btn-step1-next" onclick="goToCheckoutStep(2)" style="background:var(--primary); color:white; border:none; height:48px; border-radius:12px; font-weight:800; cursor:pointer; margin-top:10px; transition: opacity 0.2s ease;">
           Elegir Método de Pago ➜
         </button>
       </div>
@@ -1774,6 +1774,24 @@ if (!empty($pedidos)) {
 
       document.getElementById('checkout-modal').classList.add('active');
       goToCheckoutStep(1);
+      validateStep1Fields();
+  }
+
+  function validateStep1Fields() {
+      const dir = document.getElementById('chk-direccion').value.trim();
+      const tel = document.getElementById('chk-telefono').value.trim();
+      const btn = document.getElementById('btn-step1-next');
+      if (btn) {
+          if (!dir || !tel) {
+              btn.disabled = true;
+              btn.style.opacity = '0.5';
+              btn.style.cursor = 'not-allowed';
+          } else {
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn.style.cursor = 'pointer';
+          }
+      }
   }
 
   function closeCheckoutWizard() {
@@ -1781,6 +1799,15 @@ if (!empty($pedidos)) {
   }
 
   function goToCheckoutStep(step) {
+      if (step > 1) {
+          const dir = document.getElementById('chk-direccion').value.trim();
+          const tel = document.getElementById('chk-telefono').value.trim();
+          if (!dir || !tel) {
+              showAlertModal('Campos Obligatorios', 'Por favor ingresa la dirección de entrega y tu teléfono de contacto.', '✗', '#b02500');
+              return;
+          }
+      }
+      
       document.querySelectorAll('.checkout-step-container').forEach(el => el.classList.remove('active'));
       document.getElementById('chk-step-' + step).classList.add('active');
 
@@ -1935,11 +1962,21 @@ if (!empty($pedidos)) {
               );
           } else {
               showAlertModal('Error', data.message, '✗', '#b02500');
+              const btn = document.getElementById('btn-pay-submit');
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = `Pagar de Forma Segura ➜`;
+              }
           }
       })
       .catch(err => {
           console.error(err);
           showAlertModal('Error', 'No se pudo procesar tu transacción de forma segura.', '✗', '#b02500');
+          const btn = document.getElementById('btn-pay-submit');
+          if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = `Pagar de Forma Segura ➜`;
+          }
       });
   }
 
