@@ -595,23 +595,88 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Búsqueda y filtros interactivos
-function filtrarTabla() {
-    const query = document.getElementById('buscarLote').value.toLowerCase();
+// Búsqueda y filtros interactivos con paginación
+let paginaActual = 1;
+const registrosPorPagina = 5;
+let filtroQuery = "";
+let filtroEstadoActivo = "todos";
+
+function actualizarVistaInventario() {
     const rows = document.querySelectorAll('#tablaCuerpo .row-lote');
-    let visibleCount = 0;
+    const matchingRows = [];
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        if (text.includes(query)) {
-            row.style.display = 'grid';
-            visibleCount++;
+        const rEstado = row.getAttribute('data-estado');
+        
+        const matchesQuery = text.includes(filtroQuery);
+        const matchesEstado = (filtroEstadoActivo === 'todos' || rEstado === filtroEstadoActivo);
+
+        if (matchesQuery && matchesEstado) {
+            matchingRows.push(row);
         } else {
             row.style.display = 'none';
         }
     });
 
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} LOTES`;
+    const totalRegistros = matchingRows.length;
+    const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina) || 1;
+
+    if (paginaActual > totalPaginas) {
+        paginaActual = totalPaginas;
+    }
+    if (paginaActual < 1) {
+        paginaActual = 1;
+    }
+
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = inicio + registrosPorPagina;
+
+    matchingRows.forEach((row, index) => {
+        if (index >= inicio && index < fin) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const mostradosInicio = totalRegistros > 0 ? inicio + 1 : 0;
+    const mostradosFin = Math.min(fin, totalRegistros);
+    document.getElementById('paginacionTexto').textContent = 
+        `MOSTRANDO ${mostradosInicio}-${mostradosFin} DE ${totalRegistros} LOTES`;
+
+    const contenedorPaginacion = document.querySelector('.pagination-like .container-8');
+    if (contenedorPaginacion) {
+        contenedorPaginacion.innerHTML = "";
+        
+        for (let p = 1; p <= totalPaginas; p++) {
+            const btnClass = (p === paginaActual) ? 'button-3' : 'button-4';
+            const textClass = (p === paginaActual) ? 'text-23' : 'text-24';
+            
+            const btn = document.createElement('button');
+            btn.className = btnClass;
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => cambiarPagina(p);
+            
+            const divText = document.createElement('div');
+            divText.className = textClass;
+            divText.textContent = p;
+            
+            btn.appendChild(divText);
+            contenedorPaginacion.appendChild(btn);
+        }
+    }
+}
+
+function cambiarPagina(pagina) {
+    paginaActual = pagina;
+    actualizarVistaInventario();
+}
+
+function filtrarTabla() {
+    filtroQuery = document.getElementById('buscarLote').value.toLowerCase();
+    paginaActual = 1;
+    actualizarVistaInventario();
 }
 
 function filtrarEstado(estado, btn) {
@@ -629,31 +694,27 @@ function filtrarEstado(estado, btn) {
         btn.querySelector('div').className = 'text';
     }
 
-    const rows = document.querySelectorAll('#tablaCuerpo .row-lote');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        const rEstado = row.getAttribute('data-estado');
-        if (estado === 'todos' || rEstado === estado) {
-            row.style.display = 'grid';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} LOTES`;
+    filtroEstadoActivo = estado;
+    paginaActual = 1;
+    actualizarVistaInventario();
 }
 
-// Auto-filtro por URL si viene parámetro de búsqueda (ej. buscar=NombreProveedor)
-window.addEventListener('DOMContentLoaded', () => {
+// Auto-filtro por URL o inicialización
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", inicializarInventario);
+} else {
+    inicializarInventario();
+}
+
+function inicializarInventario() {
     const urlParams = new URLSearchParams(window.location.search);
     const buscarVal = urlParams.get('buscar');
     if (buscarVal) {
         document.getElementById('buscarLote').value = buscarVal;
-        filtrarTabla();
+        filtroQuery = buscarVal.toLowerCase();
     }
-});
+    actualizarVistaInventario();
+}
 </script>
 </body>
 </html>

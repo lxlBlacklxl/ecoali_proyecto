@@ -506,8 +506,11 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Búsqueda en tiempo real combinada con filtro de rol
-function filtrarTabla() {
+// Búsqueda en tiempo real combinada con filtro de rol y paginación
+let paginaActual = 1;
+const registrosPorPagina = 5;
+
+function actualizarVistaUsuarios() {
     const query = document.getElementById('buscarUsuario').value.toLowerCase();
     
     // Obtener el rol actualmente seleccionado
@@ -522,7 +525,7 @@ function filtrarTabla() {
     }
 
     const rows = document.querySelectorAll('#tablaCuerpo .row-usuario');
-    let visibleCount = 0;
+    const matchingRows = [];
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
@@ -531,14 +534,69 @@ function filtrarTabla() {
         const matchesRol = (activeRol === 'todos' || rRol === activeRol);
 
         if (matchesQuery && matchesRol) {
-            row.style.display = 'grid';
-            visibleCount++;
+            matchingRows.push(row);
         } else {
             row.style.display = 'none';
         }
     });
 
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} CUENTAS`;
+    const totalRegistros = matchingRows.length;
+    const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina) || 1;
+
+    if (paginaActual > totalPaginas) {
+        paginaActual = totalPaginas;
+    }
+    if (paginaActual < 1) {
+        paginaActual = 1;
+    }
+
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = inicio + registrosPorPagina;
+
+    matchingRows.forEach((row, index) => {
+        if (index >= inicio && index < fin) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const mostradosInicio = totalRegistros > 0 ? inicio + 1 : 0;
+    const mostradosFin = Math.min(fin, totalRegistros);
+    document.getElementById('paginacionTexto').textContent = 
+        `MOSTRANDO ${mostradosInicio}-${mostradosFin} DE ${totalRegistros} CUENTAS`;
+
+    const contenedorPaginacion = document.querySelector('.pagination-like .container-8');
+    if (contenedorPaginacion) {
+        contenedorPaginacion.innerHTML = "";
+        
+        for (let p = 1; p <= totalPaginas; p++) {
+            const btnClass = (p === paginaActual) ? 'button-3' : 'button-4';
+            const textClass = (p === paginaActual) ? 'text-23' : 'text-24';
+            
+            const btn = document.createElement('button');
+            btn.className = btnClass;
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => cambiarPagina(p);
+            
+            const divText = document.createElement('div');
+            divText.className = textClass;
+            divText.textContent = p;
+            
+            btn.appendChild(divText);
+            contenedorPaginacion.appendChild(btn);
+        }
+    }
+}
+
+function cambiarPagina(pagina) {
+    paginaActual = pagina;
+    actualizarVistaUsuarios();
+}
+
+function filtrarTabla() {
+    paginaActual = 1;
+    actualizarVistaUsuarios();
 }
 
 // Filtro rápido por rol
@@ -557,8 +615,15 @@ function filtrarRol(rol, btn) {
         btn.querySelector('div').className = 'text';
     }
 
-    // Ejecutar filtro combinado
-    filtrarTabla();
+    paginaActual = 1;
+    actualizarVistaUsuarios();
+}
+
+// Inicializar la vista con paginación al cargar el documento
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", actualizarVistaUsuarios);
+} else {
+    actualizarVistaUsuarios();
 }
 </script>
 </body>

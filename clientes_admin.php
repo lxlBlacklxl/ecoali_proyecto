@@ -542,23 +542,88 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Búsqueda en tiempo real por texto
-function filtrarTabla() {
+// Búsqueda en tiempo real por texto y paginación
+let paginaActual = 1;
+const registrosPorPagina = 5;
+
+function actualizarVistaClientes() {
     const query = document.getElementById('buscarCliente').value.toLowerCase();
     const rows = document.querySelectorAll('#tablaCuerpo .row-cliente');
-    let visibleCount = 0;
+    const matchingRows = [];
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         if (text.includes(query)) {
-            row.style.display = 'grid';
-            visibleCount++;
+            matchingRows.push(row);
         } else {
             row.style.display = 'none';
         }
     });
 
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} CLIENTES`;
+    const totalRegistros = matchingRows.length;
+    const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina) || 1;
+
+    if (paginaActual > totalPaginas) {
+        paginaActual = totalPaginas;
+    }
+    if (paginaActual < 1) {
+        paginaActual = 1;
+    }
+
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = inicio + registrosPorPagina;
+
+    matchingRows.forEach((row, index) => {
+        if (index >= inicio && index < fin) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const mostradosInicio = totalRegistros > 0 ? inicio + 1 : 0;
+    const mostradosFin = Math.min(fin, totalRegistros);
+    document.getElementById('paginacionTexto').textContent = 
+        `MOSTRANDO ${mostradosInicio}-${mostradosFin} DE ${totalRegistros} CLIENTES`;
+
+    const contenedorPaginacion = document.querySelector('.pagination-like .container-8');
+    if (contenedorPaginacion) {
+        contenedorPaginacion.innerHTML = "";
+        
+        for (let p = 1; p <= totalPaginas; p++) {
+            const btnClass = (p === paginaActual) ? 'button-3' : 'button-4';
+            const textClass = (p === paginaActual) ? 'text-23' : 'text-24';
+            
+            const btn = document.createElement('button');
+            btn.className = btnClass;
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => cambiarPagina(p);
+            
+            const divText = document.createElement('div');
+            divText.className = textClass;
+            divText.textContent = p;
+            
+            btn.appendChild(divText);
+            contenedorPaginacion.appendChild(btn);
+        }
+    }
+}
+
+function cambiarPagina(pagina) {
+    paginaActual = pagina;
+    actualizarVistaClientes();
+}
+
+function filtrarTabla() {
+    paginaActual = 1;
+    actualizarVistaClientes();
+}
+
+// Inicializar la vista con paginación al cargar el documento
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", actualizarVistaClientes);
+} else {
+    actualizarVistaClientes();
 }
 </script>
 </body>
