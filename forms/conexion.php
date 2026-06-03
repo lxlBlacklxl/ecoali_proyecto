@@ -154,24 +154,6 @@ if ($resPromoCheck && (int)$resPromoCheck->fetch_row()[0] === 0) {
     ");
 }
 
-// 9.9 CADUCIDAD AUTOMÁTICA DE LOTES (REGLA DE NEGOCIO #6):
-// Lotes de postura que excedan los 3 días de antigüedad a partir de hoy son marcados como 'caducado'.
-// Para evitar ciclos infinitos, solo buscamos lotes 'disponible' o 'bajo_stock' con fecha de postura > 3 días.
-$stmtCaducador = $conn->query("SELECT id, codigo_lote FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND DATEDIFF(CURDATE(), fecha_postura) > 3");
-if ($stmtCaducador && $stmtCaducador->num_rows > 0) {
-    while ($loteCaducado = $stmtCaducador->fetch_assoc()) {
-        $lote_id = $loteCaducado["id"];
-        $lote_code = $loteCaducado["codigo_lote"];
-        $conn->query("UPDATE inventario_huevos SET estado = 'caducado' WHERE id = $lote_id");
-        // Registrar auditoría automática en bitácora
-        registrar_bitacora(
-            "Lote caducado automáticamente", 
-            "Inventario", 
-            "El sistema detectó que el lote '$lote_code' superó los 3 días de antigüedad desde su postura y fue bloqueado automáticamente para la venta."
-        );
-    }
-}
-
 /**
  * Función global de captura de auditoría para el Sistema de Auditoría y Bitácoras (Requisito #25).
  * Registra de manera unificada cualquier acción de precio, cancelaciones y movimientos de inventario.
@@ -210,6 +192,24 @@ if (!function_exists('registrar_bitacora')) {
             $stmt->execute();
             $stmt->close();
         }
+    }
+}
+
+// 9.9 CADUCIDAD AUTOMÁTICA DE LOTES (REGLA DE NEGOCIO #6):
+// Lotes de postura que excedan los 3 días de antigüedad a partir de hoy son marcados como 'caducado'.
+// Para evitar ciclos infinitos, solo buscamos lotes 'disponible' o 'bajo_stock' con fecha de postura > 3 días.
+$stmtCaducador = $conn->query("SELECT id, codigo_lote FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND DATEDIFF(CURDATE(), fecha_postura) > 3");
+if ($stmtCaducador && $stmtCaducador->num_rows > 0) {
+    while ($loteCaducado = $stmtCaducador->fetch_assoc()) {
+        $lote_id = $loteCaducado["id"];
+        $lote_code = $loteCaducado["codigo_lote"];
+        $conn->query("UPDATE inventario_huevos SET estado = 'caducado' WHERE id = $lote_id");
+        // Registrar auditoría automática en bitácora
+        registrar_bitacora(
+            "Lote caducado automáticamente", 
+            "Inventario", 
+            "El sistema detectó que el lote '$lote_code' superó los 3 días de antigüedad desde su postura y fue bloqueado automáticamente para la venta."
+        );
     }
 }
 ?>

@@ -72,16 +72,58 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             exit;
         }
 
-        $sql = "DELETE FROM pedidos WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $id);
+        // Iniciar transacción para garantizar la atomicidad de la eliminación
+        $conn->begin_transaction();
 
-        if ($stmt->execute()) {
+        try {
+            // 1. Eliminar los detalles del pedido
+            $sqlDetalle = "DELETE FROM detalle_pedido WHERE pedido_id = ?";
+            $stmtDetalle = $conn->prepare($sqlDetalle);
+            if ($stmtDetalle) {
+                $stmtDetalle->bind_param("i", $id);
+                $stmtDetalle->execute();
+                $stmtDetalle->close();
+            }
+
+            // 2. Eliminar incidencias relacionadas si existen
+            $sqlIncidencias = "DELETE FROM incidencias WHERE pedido_id = ?";
+            $stmtIncidencias = $conn->prepare($sqlIncidencias);
+            if ($stmtIncidencias) {
+                $stmtIncidencias->bind_param("i", $id);
+                $stmtIncidencias->execute();
+                $stmtIncidencias->close();
+            }
+
+            // 3. Desvincular regalías relacionadas (poner pedido_id en NULL)
+            $sqlRegalias = "UPDATE regalias SET pedido_id = NULL WHERE pedido_id = ?";
+            $stmtRegalias = $conn->prepare($sqlRegalias);
+            if ($stmtRegalias) {
+                $stmtRegalias->bind_param("i", $id);
+                $stmtRegalias->execute();
+                $stmtRegalias->close();
+            }
+
+            // 4. Eliminar el pedido principal
+            $sqlPedido = "DELETE FROM pedidos WHERE id = ?";
+            $stmtPedido = $conn->prepare($sqlPedido);
+            if ($stmtPedido) {
+                $stmtPedido->bind_param("i", $id);
+                $stmtPedido->execute();
+                $stmtPedido->close();
+            }
+
+            // Confirmar transacción
+            $conn->commit();
+
             $_SESSION["mensaje_exito"] = "Pedido eliminado correctamente.";
-            registrar_bitacora("Pedido eliminado", "Logística", "Se eliminó de forma permanente el pedido #$id de los registros.");
-        } else {
-            $_SESSION["mensaje_error"] = "Error al eliminar el pedido: " . $conn->error;
+            registrar_bitacora("Pedido eliminado", "Logística", "Se eliminó de forma permanente el pedido #$id de los registros junto con sus detalles, incidencias y regalías vinculadas.");
+
+        } catch (Exception $e) {
+            // Revertir en caso de cualquier fallo
+            $conn->rollback();
+            $_SESSION["mensaje_error"] = "Error al eliminar el pedido: " . $e->getMessage();
         }
+
         header("Location: ../logistica_admin.php");
         exit;
     }

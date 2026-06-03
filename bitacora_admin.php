@@ -14,6 +14,18 @@ if ((int)$_SESSION["rol_id"] !== 1) {
 
 $nombre = $_SESSION["nombre"] ?? "Admin";
 
+// --- PROCESAR ACCIÓN DE VACIAR BITÁCORA ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["accion"]) && $_POST["accion"] === "vaciar") {
+    if ($conn->query("TRUNCATE TABLE bitacora")) {
+        registrar_bitacora("Limpieza de bitácora", "Bitácora", "El administrador vació todos los registros de auditoría del sistema.");
+        $_SESSION["mensaje_exito"] = "La bitácora de auditoría se ha limpiado correctamente y el historial ha sido reiniciado.";
+    } else {
+        $_SESSION["mensaje_error"] = "Error al intentar limpiar la bitácora: " . $conn->error;
+    }
+    header("Location: bitacora_admin.php");
+    exit;
+}
+
 // Obtener registros de bitácora completos con Joins
 $queryLog = "SELECT b.id, b.accion_realizada, b.modulo_afectado, b.descripcion, b.fecha, b.hora,
                     u.usuario, 
@@ -114,12 +126,29 @@ $countLog = $resultLog ? $resultLog->num_rows : 0;
   <!-- Header -->
   <div class="header-topappbar">
     <div class="div-4"><div class="text-26">Bitácora Global de Auditoría (Inmutable)</div></div>
-    <div style="display:flex; align-items:center; gap: 8px;">
+    <div style="display:flex; align-items:center; gap: 12px;">
         <span style="font-size:12px; font-weight:700; color:#b02500; background:rgba(176,37,0,0.1); padding:4px 10px; border-radius:8px;">🔒 AUDITORÍA PROTEGIDA</span>
+        <button class="button-2" style="background: linear-gradient(90deg, #b02500, #ff4c1c); box-shadow: 0 18px 35px rgba(176, 37, 0, 0.15);" onclick="abrirModalVaciar()"><div class="text-3">Limpiar Bitácora</div></button>
     </div>
   </div>
 
   <div class="main-content">
+
+    <!-- Alertas del sistema -->
+    <?php if (isset($_SESSION["mensaje_exito"])): ?>
+        <div class="alert-container" style="margin-bottom: 24px;">
+            <div class="alert alert-success">
+                <span>✓</span> <?php echo $_SESSION["mensaje_exito"]; unset($_SESSION["mensaje_exito"]); ?>
+            </div>
+        </div>
+    <?php endif; ?>
+    <?php if (isset($_SESSION["mensaje_error"])): ?>
+        <div class="alert-container" style="margin-bottom: 24px;">
+            <div class="alert alert-danger">
+                <span>✗</span> <?php echo $_SESSION["mensaje_error"]; unset($_SESSION["mensaje_error"]); ?>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- Buscador y Filtros Interactivos -->
     <div class="section-search" style="padding: 15px 20px; background: rgba(255,255,255,0.45); border-radius: 16px; margin-bottom: 24px; border: 1px solid rgba(213, 164, 112, 0.15); display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
@@ -208,7 +237,44 @@ $countLog = $resultLog ? $resultLog->num_rows : 0;
   </div>
 </div>
 
+<!-- Modal Confirmar Limpieza de Bitácora -->
+<div class="modal-overlay" id="modalVaciar">
+  <div class="modal-container" style="max-width: 460px; border: 2px solid #b02500; box-shadow: 0 30px 70px rgba(176, 37, 0, 0.25);">
+    <div class="modal-header" style="border-bottom: 1px solid rgba(176, 37, 0, 0.15); padding-bottom: 12px; margin-bottom: 16px;">
+      <div class="modal-title" style="color: #b02500; display: flex; align-items: center; gap: 8px; font-weight: 800;">
+        ⚠️ ¡ADVERTENCIA DE SEGURIDAD!
+      </div>
+      <button class="modal-close" onclick="cerrarModal('modalVaciar')" style="color: #b02500;">×</button>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <p style="color: #462800; font-size: 14px; line-height: 1.6; font-weight: 700; margin-bottom: 12px;">
+        ¿Estás seguro de que deseas limpiar todo el historial de auditoría?
+      </p>
+      <p style="color: #7a5427; font-size: 13px; line-height: 1.5; background: rgba(176, 37, 0, 0.05); padding: 12px; border-radius: 12px; border-left: 4px solid #b02500;">
+        Esta acción eliminará de forma permanente e irreversible todos los registros de actividades del sistema. <strong>Esta operación no se puede deshacer.</strong>
+      </p>
+    </div>
+
+    <form action="bitacora_admin.php" method="POST">
+      <input type="hidden" name="accion" value="vaciar">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="cerrarModal('modalVaciar')">Cancelar y Volver</button>
+        <button type="submit" class="btn-submit" style="background: linear-gradient(90deg, #b02500, #ff4c1c); box-shadow: 0 10px 25px rgba(176, 37, 0, 0.15);">Aceptar y Limpiar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+function abrirModalVaciar() {
+    document.getElementById('modalVaciar').classList.add('active');
+}
+
+function cerrarModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
 // Filtrado interactivo combinado
 function filtrarBitacora() {
     const textQuery = document.getElementById('buscarLog').value.toLowerCase();

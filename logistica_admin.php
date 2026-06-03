@@ -178,7 +178,10 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
   <div class="header-topappbar">
     <div class="div-4"><div class="text-26">Gestión de Pedidos y Logística</div></div>
 
-    <button class="button-2" onclick="abrirModalCrear()"><div class="text-3">Asignar pedido</div></button>
+    <div style="display: flex; gap: 12px;">
+      <button class="button-2" style="background: linear-gradient(90deg, #ff8a00, #ffb300); box-shadow: 0 18px 35px rgba(255, 138, 0, 0.15);" onclick="abrirModalImprimir()"><div class="text-3">Imprimir Pedidos</div></button>
+      <button class="button-2" onclick="abrirModalCrear()"><div class="text-3">Asignar pedido</div></button>
+    </div>
   </div>
 
   <div class="main-content">
@@ -340,6 +343,40 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
      MODALES (CREATE, EDIT, DELETE)
      ========================================== -->
 
+<!-- Modal Opciones de Impresión -->
+<div class="modal-overlay" id="modalImprimir">
+  <div class="modal-container" style="max-width: 440px;">
+    <div class="modal-header">
+      <div class="modal-title">Imprimir Registro de Pedidos</div>
+      <button class="modal-close" onclick="cerrarModal('modalImprimir')">×</button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px; margin-bottom: 10px;">
+      <p style="color: #7a5427; font-size: 13px; line-height: 1.5; margin-bottom: 8px;">
+        Selecciona la categoría de pedidos que deseas imprimir o guardar en formato PDF:
+      </p>
+      
+      <a href="imprimir_pedidos.php?filtro=todos" target="_blank" class="btn-submit" style="text-align: center; text-decoration: none; display: block; background: #8d4a00; color: white;" onclick="cerrarModal('modalImprimir')">
+        🖨️ Imprimir Todos los Pedidos
+      </a>
+      
+      <a href="imprimir_pedidos.php?filtro=entregados" target="_blank" class="btn-submit" style="text-align: center; text-decoration: none; display: block; background: #176a21; color: white;" onclick="cerrarModal('modalImprimir')">
+        🖨️ Imprimir Pedidos Entregados
+      </a>
+      
+      <a href="imprimir_pedidos.php?filtro=cancelados" target="_blank" class="btn-submit" style="text-align: center; text-decoration: none; display: block; background: #b02500; color: white;" onclick="cerrarModal('modalImprimir')">
+        🖨️ Imprimir Pedidos Cancelados
+      </a>
+      
+      <a href="imprimir_pedidos.php?filtro=no_asignados" target="_blank" class="btn-submit" style="text-align: center; text-decoration: none; display: block; background: #ff8a00; color: white;" onclick="cerrarModal('modalImprimir')">
+        🖨️ Imprimir Pedidos No Asignados
+      </a>
+    </div>
+    <div class="modal-actions" style="margin-top: 20px;">
+      <button type="button" class="btn-cancel" onclick="cerrarModal('modalImprimir')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Crear/Asignar Pedido -->
 <div class="modal-overlay" id="modalCrear">
   <div class="modal-container">
@@ -483,6 +520,10 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
      SCRIPTS DE CONTROL INTERACTIVO
      ========================================== -->
 <script>
+function abrirModalImprimir() {
+    document.getElementById('modalImprimir').classList.add('active');
+}
+
 function abrirModalCrear() {
     document.getElementById('modalCrear').classList.add('active');
 }
@@ -518,23 +559,89 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Búsqueda y filtros interactivos
-function filtrarTabla() {
-    const query = document.getElementById('buscarPedido').value.toLowerCase();
-    const rows = document.querySelectorAll('#tablaCuerpo .row-pedido');
-    let visibleCount = 0;
+// Búsqueda y filtros interactivos con paginación
+let paginaActual = 1;
+const registrosPorPagina = 5;
+let filtroQuery = "";
+let filtroEstado = "todos";
 
+function actualizarVista() {
+    const rows = document.querySelectorAll('#tablaCuerpo .row-pedido');
+    const matchingRows = [];
+    
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        if (text.includes(query)) {
-            row.style.display = 'grid';
-            visibleCount++;
+        const rEstado = row.getAttribute('data-estado');
+        
+        const matchesQuery = text.includes(filtroQuery);
+        const matchesEstado = (filtroEstado === 'todos' || rEstado === filtroEstado || (filtroEstado === 'en_ruta' && rEstado === 'en proceso'));
+        
+        if (matchesQuery && matchesEstado) {
+            matchingRows.push(row);
         } else {
             row.style.display = 'none';
         }
     });
 
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} PEDIDOS`;
+    const totalRegistros = matchingRows.length;
+    const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina) || 1;
+
+    // Asegurar rango válido de página
+    if (paginaActual > totalPaginas) {
+        paginaActual = totalPaginas;
+    }
+    if (paginaActual < 1) {
+        paginaActual = 1;
+    }
+
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = inicio + registrosPorPagina;
+
+    matchingRows.forEach((row, index) => {
+        if (index >= inicio && index < fin) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const mostradosInicio = totalRegistros > 0 ? inicio + 1 : 0;
+    const mostradosFin = Math.min(fin, totalRegistros);
+    document.getElementById('paginacionTexto').textContent = 
+        `MOSTRANDO ${mostradosInicio}-${mostradosFin} DE ${totalRegistros} PEDIDOS`;
+
+    const contenedorPaginacion = document.querySelector('.pagination-like .container-8');
+    if (contenedorPaginacion) {
+        contenedorPaginacion.innerHTML = "";
+        
+        for (let p = 1; p <= totalPaginas; p++) {
+            const btnClass = (p === paginaActual) ? 'button-3' : 'button-4';
+            const textClass = (p === paginaActual) ? 'text-23' : 'text-24';
+            
+            const btn = document.createElement('button');
+            btn.className = btnClass;
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => cambiarPagina(p);
+            
+            const divText = document.createElement('div');
+            divText.className = textClass;
+            divText.textContent = p;
+            
+            btn.appendChild(divText);
+            contenedorPaginacion.appendChild(btn);
+        }
+    }
+}
+
+function cambiarPagina(pagina) {
+    paginaActual = pagina;
+    actualizarVista();
+}
+
+function filtrarTabla() {
+    filtroQuery = document.getElementById('buscarPedido').value.toLowerCase();
+    paginaActual = 1;
+    actualizarVista();
 }
 
 function filtrarEstado(estado, btn) {
@@ -551,21 +658,15 @@ function filtrarEstado(estado, btn) {
         btn.querySelector('div').className = 'text';
     }
 
-    const rows = document.querySelectorAll('#tablaCuerpo .row-pedido');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        const rEstado = row.getAttribute('data-estado');
-        if (estado === 'todos' || rEstado === estado || (estado === 'en_ruta' && rEstado === 'en proceso')) {
-            row.style.display = 'grid';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} PEDIDOS`;
+    filtroEstado = estado;
+    paginaActual = 1;
+    actualizarVista();
 }
+
+// Inicializar la vista con paginación al cargar el documento
+document.addEventListener("DOMContentLoaded", () => {
+    actualizarVista();
+});
 </script>
 </body>
 </html>

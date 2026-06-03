@@ -110,7 +110,7 @@ body {
   display: block !important; /* Shown only when active! */
   opacity: 1 !important;
   pointer-events: auto !important;
-  z-index: 9999997 !important;
+  z-index: 9998 !important;
 }
 
 /* RESPONSIVE LAYOUT FOR TABLETS & MOBILE (<= 991px) */
@@ -155,7 +155,7 @@ body {
   /* ADMIN SLIDING DRAWER AND HAMBURGER (ONLY active inside admin wrapper .gestin-de-inventario) */
   .gestin-de-inventario .admin-hamburger {
     display: flex !important;
-    z-index: 9999999 !important;
+    z-index: 10000 !important;
   }
 
   .gestin-de-inventario .aside {
@@ -166,7 +166,7 @@ body {
     height: 100vh !important;
     margin: 0 !important;
     border-radius: 0 !important;
-    z-index: 9999998 !important;
+    z-index: 9999 !important;
     display: flex !important;
     flex-direction: column !important;
     padding: 80px 20px 30px !important; /* Safe top padding to clear floating hamburger */

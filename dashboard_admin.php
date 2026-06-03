@@ -241,7 +241,7 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
     <?php endif; ?>
 
     <!-- Primer bloque de métricas: Resumen General -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
+    <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
       <div class="background-border" style="padding: 24px; min-height: auto;">
         <div class="container-5"><div class="text-wrapper-2" style="font-size:11px;">CLIENTES ACTIVOS</div></div>
         <div class="div-2" style="margin-top: 10px;"><div class="text-wrapper-3"><?php echo $clientesActivos; ?></div></div>
@@ -264,7 +264,7 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
     </div>
 
     <!-- Segundo bloque de métricas: Inventario, Producción y Logística -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
+    <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
       <div class="background-border-3" style="padding: 20px; min-height: auto; border-color: rgba(23, 106, 33, 0.25);">
         <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">STOCK TOTAL HUEVOS</div></div>
         <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px; color:#176a21;"><?php echo number_format($stockTotal); ?> ud</div></div>
@@ -292,7 +292,7 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
     </div>
 
     <!-- Tercer bloque de métricas: Pedidos y Distribución -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px;">
+    <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px;">
       <div class="background-border-2" style="padding: 20px; min-height: auto;">
         <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">PEDIDOS PENDIENTES</div></div>
         <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px;"><?php echo $pedidosPendientes; ?></div></div>
