@@ -275,40 +275,111 @@ function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Filtrado interactivo combinado
-function filtrarBitacora() {
-    const textQuery = document.getElementById('buscarLog').value.toLowerCase();
-    const modQuery = document.getElementById('filtrarModulo').value;
-    const dateQuery = document.getElementById('filtrarFecha').value;
-    
-    const rows = document.querySelectorAll('#tablaCuerpo .row-bitacora');
-    let visibleCount = 0;
+// Filtrado interactivo combinado con paginación
+let paginaActual = 1;
+const registrosPorPagina = 5;
+let filtroText = "";
+let filtroModulo = "todos";
+let filtroFecha = "";
 
+function actualizarVistaBitacora() {
+    const rows = document.querySelectorAll('#tablaCuerpo .row-bitacora');
+    const matchingRows = [];
+    
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const rModulo = row.getAttribute('data-modulo');
         const rFecha = row.getAttribute('data-fecha');
         
-        let matchText = text.includes(textQuery);
-        let matchModulo = (modQuery === 'todos' || rModulo === modQuery);
-        let matchFecha = (!dateQuery || rFecha === dateQuery);
+        const matchText = text.includes(filtroText);
+        const matchModulo = (filtroModulo === 'todos' || rModulo === filtroModulo);
+        const matchFecha = (!filtroFecha || rFecha === filtroFecha);
         
         if (matchText && matchModulo && matchFecha) {
-            row.style.display = 'grid';
-            visibleCount++;
+            matchingRows.push(row);
         } else {
             row.style.display = 'none';
         }
     });
+    
+    const totalRegistros = matchingRows.length;
+    const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina) || 1;
+    
+    if (paginaActual > totalPaginas) {
+        paginaActual = totalPaginas;
+    }
+    if (paginaActual < 1) {
+        paginaActual = 1;
+    }
+    
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = inicio + registrosPorPagina;
+    
+    matchingRows.forEach((row, index) => {
+        if (index >= inicio && index < fin) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    const mostradosInicio = totalRegistros > 0 ? inicio + 1 : 0;
+    const mostradosFin = Math.min(fin, totalRegistros);
+    document.getElementById('paginacionTexto').textContent = 
+        `MOSTRANDO ${mostradosInicio}-${mostradosFin} DE ${totalRegistros} REGISTROS DE SEGURIDAD`;
+        
+    const contenedorPaginacion = document.querySelector('.pagination-like .container-8');
+    if (contenedorPaginacion) {
+        contenedorPaginacion.innerHTML = "";
+        
+        for (let p = 1; p <= totalPaginas; p++) {
+            const btnClass = (p === paginaActual) ? 'button-3' : 'button-4';
+            const textClass = (p === paginaActual) ? 'text-23' : 'text-24';
+            
+            const btn = document.createElement('button');
+            btn.className = btnClass;
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => cambiarPagina(p);
+            
+            const divText = document.createElement('div');
+            divText.className = textClass;
+            divText.textContent = p;
+            
+            btn.appendChild(divText);
+            contenedorPaginacion.appendChild(btn);
+        }
+    }
+}
 
-    document.getElementById('paginacionTexto').textContent = `MOSTRANDO ${visibleCount} DE ${rows.length} REGISTROS DE SEGURIDAD`;
+function cambiarPagina(pagina) {
+    paginaActual = pagina;
+    actualizarVistaBitacora();
+}
+
+function filtrarBitacora() {
+    filtroText = document.getElementById('buscarLog').value.toLowerCase();
+    filtroModulo = document.getElementById('filtrarModulo').value;
+    filtroFecha = document.getElementById('filtrarFecha').value;
+    paginaActual = 1;
+    actualizarVistaBitacora();
 }
 
 function limpiarFiltros() {
     document.getElementById('buscarLog').value = '';
     document.getElementById('filtrarModulo').value = 'todos';
     document.getElementById('filtrarFecha').value = '';
-    filtrarBitacora();
+    filtroText = "";
+    filtroModulo = "todos";
+    filtroFecha = "";
+    paginaActual = 1;
+    actualizarVistaBitacora();
+}
+
+// Inicializar la vista con paginación al cargar el documento
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", actualizarVistaBitacora);
+} else {
+    actualizarVistaBitacora();
 }
 </script>
 </body>
