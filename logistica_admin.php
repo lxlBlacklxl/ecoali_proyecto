@@ -90,14 +90,21 @@ $clientesSelect = $conn->query("SELECT u.id, CONCAT(up.nombre, ' ', up.apellido)
 $repartidoresSelect = $conn->query("SELECT u.id, CONCAT(up.nombre, ' ', up.apellido) AS nombre FROM usuarios u INNER JOIN usuario_perfil up ON u.id = up.usuario_id WHERE u.rol_id = 4 ORDER BY up.nombre ASC");
 
 // Obtener listado de pedidos dinámicos con JOINS
-$sqlPedidosList = "SELECT p.*, 
-                          CONCAT(upc.nombre, ' ', upc.apellido) AS nombre_cliente, 
+// Los pedidos ATRASADOS (pendiente/en_ruta con más de 24h) aparecen primero
+$sqlPedidosList = "SELECT p.*,
+                          CONCAT(upc.nombre, ' ', upc.apellido) AS nombre_cliente,
                           upc.direccion AS direccion_cliente,
-                          CONCAT(upr.nombre, ' ', upr.apellido) AS nombre_repartidor
+                          CONCAT(upr.nombre, ' ', upr.apellido) AS nombre_repartidor,
+                          CASE
+                            WHEN p.estado IN ('pendiente','en_ruta')
+                              AND p.fecha_pedido < NOW() - INTERVAL 24 HOUR
+                            THEN 1
+                            ELSE 0
+                          END AS es_atrasado
                    FROM pedidos p
                    LEFT JOIN usuario_perfil upc ON p.cliente_id = upc.usuario_id
                    LEFT JOIN usuario_perfil upr ON p.repartidor_id = upr.usuario_id
-                   ORDER BY p.id DESC";
+                   ORDER BY es_atrasado DESC, p.id DESC";
 $resultPedidos = $conn->query($sqlPedidosList);
 $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
 
@@ -146,28 +153,50 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
     background-position: right 10px center;
     padding-right: 26px;
   }
-  .rep-select:hover {
-    border-color: #ff8a00;
-    background-color: #fff7ef;
+  .rep-select:hover   { border-color: #ff8a00; background-color: #fff7ef; }
+  .rep-select:focus   { border-color: #ff8a00; box-shadow: 0 0 0 3px rgba(255,138,0,.14); background-color: white; }
+  .rep-select.saving  { border-color: #1786ba; background-color: #f0f8ff; pointer-events: none; opacity: .8; }
+  .rep-select.saved   { border-color: #176a21; background-color: #f0fff3; }
+  .rep-select.error-save { border-color: #b02500; background-color: #fff4f2; }
+
+  /* ── Pedidos atrasados ── */
+  .row-atrasado {
+    background: linear-gradient(90deg, rgba(176,37,0,.07) 0%, rgba(255,76,28,.04) 100%) !important;
+    border-left: 4px solid #b02500 !important;
+    position: relative;
+    animation: pulse-red-bg 2.5s ease-in-out infinite;
   }
-  .rep-select:focus {
-    border-color: #ff8a00;
-    box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.14);
-    background-color: white;
+  @keyframes pulse-red-bg {
+    0%, 100% { background-color: rgba(176,37,0,.04); }
+    50%       { background-color: rgba(176,37,0,.10); }
   }
-  .rep-select.saving {
-    border-color: #1786ba;
-    background-color: #f0f8ff;
-    pointer-events: none;
-    opacity: 0.8;
+  .badge-atrasado {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #b02500;
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+    animation: blink-badge 1.4s ease-in-out infinite;
+    white-space: nowrap;
   }
-  .rep-select.saved {
-    border-color: #176a21;
-    background-color: #f0fff3;
+  @keyframes blink-badge {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .45; }
   }
-  .rep-select.error-save {
-    border-color: #b02500;
-    background-color: #fff4f2;
+  /* Texto de la fila atrasada en rojo oscuro */
+  .row-atrasado .text-10,
+  .row-atrasado .text-11,
+  .row-atrasado .text-12,
+  .row-atrasado .text-14 {
+    color: #7a1a00 !important;
   }
 </style>
 </head>
@@ -348,8 +377,18 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
                   $estadoText = "Cancelado";
               }
           ?>
-          <div class="div-3 row-pedido" data-estado="<?php echo $estado; ?>" style="grid-template-columns: 1fr 1.8fr 2.5fr 1.8fr 1.2fr 1.8fr 1.2fr 1.3fr; border-bottom: 1px solid rgba(213,164,112,.12);">
-            <div><div class="text-10">#PED-<?php echo str_pad($row["id"], 3, "0", STR_PAD_LEFT); ?></div></div>
+          <?php 
+              $esAtrasado = !empty($row['es_atrasado']) && (int)$row['es_atrasado'] === 1;
+              $rowExtraClass = $esAtrasado ? ' row-atrasado' : '';
+              $rowAtrasadoData = $esAtrasado ? ' data-atrasado="1"' : '';
+          ?>
+          <div class="div-3 row-pedido<?php echo $rowExtraClass; ?>" data-estado="<?php echo $estado; ?>"<?php echo $rowAtrasadoData; ?> style="grid-template-columns: 1fr 1.8fr 2.5fr 1.8fr 1.2fr 1.8fr 1.2fr 1.3fr; border-bottom: 1px solid rgba(213,164,112,.12);">
+            <div><div class="text-10">
+              #PED-<?php echo str_pad($row["id"], 3, "0", STR_PAD_LEFT); ?>
+              <?php if ($esAtrasado): ?>
+                <span class="badge-atrasado">⚠ ATRASADO</span>
+              <?php endif; ?>
+            </div></div>
             <div><div class="text-11" style="font-weight: 700;"><?php echo htmlspecialchars($row["nombre_cliente"] ?? "Cliente Anónimo"); ?></div></div>
             <div><div class="text-12"><?php echo htmlspecialchars($row["direccion_cliente"] ?? "Sin dirección de entrega"); ?></div></div>
             <div>
