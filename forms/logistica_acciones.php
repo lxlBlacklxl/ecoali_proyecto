@@ -2,10 +2,21 @@
 session_start();
 require "conexion.php";
 
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    header("Content-Type: application/json");
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Content-Type: application/json");
+        echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
+        exit;
+    }
 }
 
 $accion = $_POST["accion"] ?? $_GET["accion"] ?? "";
@@ -125,6 +136,39 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
 
         header("Location: ../logistica_admin.php");
+        exit;
+    } elseif ($accion === "asignar_repartidor") {
+        // AJAX quick-assign: solo actualiza el campo repartidor_id del pedido
+        header("Content-Type: application/json");
+        $id            = (int)($_POST["id"] ?? 0);
+        $repartidor_id = isset($_POST["repartidor_id"]) && $_POST["repartidor_id"] !== ""
+                         ? (int)$_POST["repartidor_id"] : null;
+
+        if ($id <= 0) {
+            echo json_encode(["status" => "error", "message" => "ID de pedido inválido."]);
+            exit;
+        }
+
+        $sql  = "UPDATE pedidos SET repartidor_id = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $repartidor_id, $id);
+
+        if ($stmt->execute()) {
+            // Obtener nombre del repartidor para devolver al frontend
+            $nombre_rep = "No asignado";
+            if ($repartidor_id) {
+                $res = $conn->prepare("SELECT CONCAT(nombre, ' ', apellido) AS nombre FROM usuario_perfil WHERE usuario_id = ?");
+                $res->bind_param("i", $repartidor_id);
+                $res->execute();
+                $row = $res->get_result()->fetch_assoc();
+                if ($row) $nombre_rep = $row["nombre"];
+            }
+            registrar_bitacora("Repartidor asignado", "Logística",
+                "Se asignó el repartidor '$nombre_rep' (ID: " . ($repartidor_id ?? 'ninguno') . ") al pedido #$id.");
+            echo json_encode(["status" => "success", "message" => "Repartidor actualizado."]);
+        } else {
+            echo json_encode(["status" => "error", "message" => "Error al actualizar: " . $conn->error]);
+        }
         exit;
     }
 }

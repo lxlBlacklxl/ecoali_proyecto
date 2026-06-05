@@ -2,10 +2,21 @@
 session_start();
 require "conexion.php";
 
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    header("Content-Type: application/json");
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Content-Type: application/json");
+        echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
+        exit;
+    }
 }
 
 $accion = $_POST["accion"] ?? $_GET["accion"] ?? "";
@@ -82,11 +93,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $id);
 
-        if ($stmt->execute()) {
-            $_SESSION["mensaje_exito"] = "Producto eliminado correctamente.";
-            registrar_bitacora("Producto eliminado", "Productos", "Se eliminó permanentemente del catálogo el producto '$nombreProd' (ID: $id).");
-        } else {
-            $_SESSION["mensaje_error"] = "Error al eliminar producto (puede tener lotes vinculados en inventario): " . $conn->error;
+        try {
+            if ($stmt->execute()) {
+                $_SESSION["mensaje_exito"] = "Producto eliminado correctamente del catálogo.";
+                registrar_bitacora("Producto eliminado", "Productos", "Se eliminó permanentemente del catálogo el producto '$nombreProd' (ID: $id).");
+            } else {
+                $_SESSION["mensaje_error"] = "Error al intentar eliminar el producto.";
+            }
+        } catch (mysqli_sql_exception $e) {
+            // Código 1451: Restricción de integridad referencial (tiene registros relacionados)
+            if ($e->getCode() === 1451) {
+                // Intentar desactivarlo automáticamente
+                $stmtDes = $conn->prepare("UPDATE productos SET activo = 0 WHERE id = ?");
+                $stmtDes->bind_param("i", $id);
+                if ($stmtDes->execute()) {
+                    $_SESSION["mensaje_exito"] = "El producto no se puede eliminar de forma permanente por tener historial asociado (producción/pedidos). Se ha desactivado automáticamente para no mostrarse en el catálogo.";
+                    registrar_bitacora("Producto desactivado automáticamente", "Productos", "Se desactivó el producto '$nombreProd' (ID: $id) por restricción de integridad referencial.");
+                } else {
+                    $_SESSION["mensaje_error"] = "Error al intentar desactivar el producto con historial asociado.";
+                }
+                $stmtDes->close();
+            } else {
+                $_SESSION["mensaje_error"] = "Error crítico de base de datos al eliminar: " . $e->getMessage();
+            }
         }
         header("Location: ../productos_admin.php");
         exit;

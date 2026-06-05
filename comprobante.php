@@ -12,7 +12,7 @@ session_start();
 require "forms/conexion.php";
 
 // 1. VALIDAR ACCESO (SESIÓN ACTIVA)
-if (!isset($_SESSION["usuario_id"])) {
+if (!isset($_SESSION["usuario_id"]) && !isset($_SESSION["admin_session"])) {
     die("Por favor inicia sesión para ver este comprobante.");
 }
 
@@ -22,8 +22,8 @@ if ($pedido_id <= 0) {
     die("ID de pedido no válido.");
 }
 
-$cliente_id = $_SESSION["usuario_id"];
-$rol_id = (int)$_SESSION["rol_id"];
+$rol_id = isset($_SESSION["admin_session"]) ? (int)$_SESSION["admin_session"]["rol_id"] : (int)($_SESSION["rol_id"] ?? 0);
+$cliente_id = isset($_SESSION["admin_session"]) ? $_SESSION["admin_session"]["usuario_id"] : ($_SESSION["usuario_id"] ?? 0);
 
 // 2. CONSULTAR CABECERA DEL PEDIDO Y PERFIL DEL CLIENTE
 // Si es admin, puede ver cualquier factura. Si es cliente, solo la suya propia.

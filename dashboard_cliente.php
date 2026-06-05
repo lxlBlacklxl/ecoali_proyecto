@@ -70,7 +70,7 @@ if (!empty($direccion)) {
 // 2. Obtener productos activos de la BD con stock disponible real-time (Requirement 1)
 $productosRes = $conn->query("SELECT p.*, COALESCE(SUM(i.cantidad), 0) AS stock_total 
                              FROM productos p 
-                             LEFT JOIN inventario_huevos i ON p.id = i.producto_id AND i.estado = 'disponible' AND i.cantidad > 0
+                             LEFT JOIN inventario_huevos i ON p.id = i.producto_id AND i.estado IN ('disponible', 'bajo_stock') AND i.cantidad > 0
                              WHERE p.activo = 1 
                              GROUP BY p.id 
                              ORDER BY p.id DESC");
@@ -666,11 +666,24 @@ if (!empty($pedidos)) {
 
     /* Cart drawer safety constraint */
     .cart-drawer {
-      overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: visible !important;
       height: 100vh !important;
       max-height: 100vh !important;
       box-sizing: border-box !important;
       z-index: 1000000 !important;
+    }
+
+    /* Cart items scrollable, footer always pinned at bottom */
+    .cart-items-list {
+      flex: 1 1 auto !important;
+      overflow-y: auto !important;
+    }
+
+    .cart-footer {
+      flex: 0 0 auto !important;
+      overflow: visible !important;
     }
     
     .cart-drawer-overlay {
@@ -690,9 +703,6 @@ if (!empty($pedidos)) {
     }
 
     /* Estilizado del Footer y Contenedores */
-    .cart-footer {
-      box-sizing: border-box !important;
-    }
     .notif-footer {
       box-sizing: border-box !important;
     }
@@ -738,6 +748,121 @@ if (!empty($pedidos)) {
       .cart-drawer.active {
         right: 0 !important;
       }
+    }
+
+    /* Estilos Premium para los Elementos del Carrito (cart-item) */
+    .cart-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: white;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 20px rgba(70, 40, 0, 0.02);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      gap: 12px;
+    }
+    .cart-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(70, 40, 0, 0.05);
+    }
+    .cart-item-info {
+      flex-grow: 1;
+      min-width: 0;
+    }
+    .cart-item-info h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cart-item-info p {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--secondary);
+    }
+    .cart-item-qty {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #faf6f2;
+      padding: 4px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(213, 164, 112, 0.16);
+    }
+    .cart-item-qty button {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: none;
+      background: white;
+      color: var(--text-medium);
+      font-size: 14px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(70, 40, 0, 0.04);
+    }
+    .cart-item-qty button:hover {
+      background: var(--primary);
+      color: white;
+      transform: scale(1.05);
+    }
+    .cart-item-qty span {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-dark);
+      min-width: 18px;
+      text-align: center;
+    }
+    /* Manual quantity input inside cart */
+    .cart-qty-input {
+      width: 44px;
+      height: 28px;
+      border: 1px solid rgba(213, 164, 112, 0.35);
+      border-radius: 8px;
+      background: white;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-dark);
+      font-family: inherit;
+      padding: 0 4px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .cart-qty-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.12);
+    }
+    /* Remove native spin arrows */
+    .cart-qty-input::-webkit-inner-spin-button,
+    .cart-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .cart-qty-input[type=number] { -moz-appearance: textfield; }
+    .cart-item-remove {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(176, 37, 0, 0.05);
+      color: #b02500;
+      font-size: 13px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .cart-item-remove:hover {
+      background: #b02500;
+      color: white;
+      transform: scale(1.05);
     }
   </style>
 </head>
@@ -1136,7 +1261,7 @@ if (!empty($pedidos)) {
       <span id="cart-total" style="color:var(--secondary);">$0.00</span>
     </div>
 
-    <button onclick="openCheckoutWizard()" style="height:52px; border-radius:14px; border:none; background:var(--primary); color:white; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 10px 20px rgba(255,138,0,0.2);">
+    <button onclick="openCheckoutWizard()" style="width:100%; height:52px; border-radius:14px; border:none; background:var(--primary); color:white; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 10px 20px rgba(255,138,0,0.2); transition: all 0.2s ease;" onmouseover="this.style.background='#e07b00';" onmouseout="this.style.background='var(--primary)';">
       Proceder al Checkout ➜
     </button>
   </div>
@@ -1735,17 +1860,32 @@ if (!empty($pedidos)) {
   function updateQty(id, change) {
       const item = ecoaliCart.find(it => it.producto_id === id);
       if (item) {
-          item.cantidad += change;
-          if (item.cantidad > item.maxStock) {
+          const next = item.cantidad + change;
+          if (next > item.maxStock) {
               item.cantidad = item.maxStock;
-              alert('Límite de stock disponible alcanzado.');
-          }
-          if (item.cantidad <= 0) {
+              alert('Límite de stock disponible alcanzado (' + item.maxStock + ' ud).');
+          } else if (next <= 0) {
               ecoaliCart = ecoaliCart.filter(it => it.producto_id !== id);
+          } else {
+              item.cantidad = next;
           }
           saveCart();
           updateCartUI();
       }
+  }
+
+  function setQty(id, rawValue, maxStock) {
+      const item = ecoaliCart.find(it => it.producto_id === id);
+      if (!item) return;
+      let val = parseInt(rawValue, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > maxStock) {
+          val = maxStock;
+          alert('Límite de stock disponible alcanzado (' + maxStock + ' ud).');
+      }
+      item.cantidad = val;
+      saveCart();
+      updateCartUI();
   }
 
   function removeFromCart(id) {
@@ -1831,7 +1971,15 @@ if (!empty($pedidos)) {
                   </div>
                   <div class="cart-item-qty">
                     <button onclick="updateQty(${item.producto_id}, -1)">-</button>
-                    <span>${item.cantidad}</span>
+                    <input
+                      type="number"
+                      class="cart-qty-input"
+                      value="${item.cantidad}"
+                      min="1"
+                      max="${item.maxStock}"
+                      onchange="setQty(${item.producto_id}, this.value, ${item.maxStock})"
+                      onkeydown="if(event.key==='Enter') this.blur()"
+                    >
                     <button onclick="updateQty(${item.producto_id}, 1)">+</button>
                   </div>
                   <button class="cart-item-remove" onclick="removeFromCart(${item.producto_id})">🗑</button>

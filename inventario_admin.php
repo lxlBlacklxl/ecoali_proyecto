@@ -2,17 +2,23 @@
 session_start();
 require "forms/conexion.php";
 
-if (!isset($_SESSION["usuario_id"])) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Location: login.php");
+        exit;
+    }
 }
 
-if ((int)$_SESSION["rol_id"] !== 1) {
-    header("Location: login.php");
-    exit;
-}
-
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 
 // Verificar y precargar productos base si la tabla está vacía
 $prodCountRes = $conn->query("SELECT COUNT(*) FROM productos");
@@ -31,14 +37,14 @@ $totalHuevosRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos");
 $totHueRow = $totalHuevosRes ? $totalHuevosRes->fetch_row() : null;
 $totalHuevos = $totHueRow && !is_null($totHueRow[0]) ? (int)$totHueRow[0] : 0;
 
-$disponiblesHuevosRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE estado = 'disponible'");
+$disponiblesHuevosRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock')");
 $dispHueRow = $disponiblesHuevosRes ? $disponiblesHuevosRes->fetch_row() : null;
 $disponiblesHuevos = $dispHueRow && !is_null($dispHueRow[0]) ? (int)$dispHueRow[0] : 0;
 
-$proximosRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado = 'disponible' AND fecha_caducidad <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND fecha_caducidad >= CURDATE()");
+$proximosRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND fecha_caducidad <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND fecha_caducidad >= CURDATE()");
 $proximosCaducar = $proximosRes ? $proximosRes->fetch_row()[0] : 0;
 
-$caducadosRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado = 'caducado' OR (estado = 'disponible' AND fecha_caducidad < CURDATE())");
+$caducadosRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado = 'caducado' OR (estado IN ('disponible', 'bajo_stock') AND fecha_caducidad < CURDATE())");
 $caducadosStock = $caducadosRes ? $caducadosRes->fetch_row()[0] : 0;
 
 // Obtener proveedores y productos para los modales selectores

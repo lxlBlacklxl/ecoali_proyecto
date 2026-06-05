@@ -4,8 +4,13 @@ require "conexion.php";
 
 header("Content-Type: application/json");
 
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 3) {
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado."]);
+if (!isset($_SESSION["usuario_id"])) {
+    echo json_encode(["status" => "error", "message" => "Tu sesión ha expirado. Por favor, vuelve a iniciar sesión para continuar."]);
+    exit;
+}
+
+if ((int)$_SESSION["rol_id"] !== 3) {
+    echo json_encode(["status" => "error", "message" => "Acceso no autorizado: tu sesión actual pertenece a otro perfil (posiblemente iniciaste sesión en otra pestaña). Por favor, recarga la página o vuelve a entrar como Proveedor."]);
     exit;
 }
 

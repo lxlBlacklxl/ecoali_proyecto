@@ -3,11 +3,22 @@ session_start();
 require "forms/conexion.php";
 
 // 1. Control de acceso: Solo administradores
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    die("Acceso no autorizado.");
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        die("Acceso no autorizado.");
+    }
 }
 
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 $filtro = $_GET["filtro"] ?? "todos";
 
 // 2. Construir consulta según el filtro

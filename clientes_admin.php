@@ -2,17 +2,23 @@
 session_start();
 require "forms/conexion.php";
 
-if (!isset($_SESSION["usuario_id"])) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Location: login.php");
+        exit;
+    }
 }
 
-if ((int)$_SESSION["rol_id"] !== 1) {
-    header("Location: login.php");
-    exit;
-}
-
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 
 // 1. Clientes totales
 $totCliRes = $conn->query("SELECT COUNT(*) FROM usuarios WHERE rol_id = 2");

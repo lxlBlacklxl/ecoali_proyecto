@@ -2,17 +2,23 @@
 session_start();
 require "forms/conexion.php";
 
-if (!isset($_SESSION["usuario_id"])) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Location: login.php");
+        exit;
+    }
 }
 
-if ((int)$_SESSION["rol_id"] !== 1) {
-    header("Location: login.php");
-    exit;
-}
-
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 
 // --- INICIALIZACIÓN DE DATOS DE PRUEBA SI LA BD ESTÁ VACÍA ---
 
@@ -94,6 +100,16 @@ $sqlPedidosList = "SELECT p.*,
                    ORDER BY p.id DESC";
 $resultPedidos = $conn->query($sqlPedidosList);
 $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
+
+// Fetch active delivery drivers as array for JavaScript use
+$repartidoresJS = [];
+$resRepsJS = $conn->query("SELECT u.id, CONCAT(up.nombre, ' ', up.apellido) AS nombre FROM usuarios u INNER JOIN usuario_perfil up ON u.id = up.usuario_id WHERE u.rol_id = 4 AND u.activo = 1 ORDER BY up.nombre ASC");
+if ($resRepsJS) {
+    while ($rr = $resRepsJS->fetch_assoc()) {
+        $repartidoresJS[] = $rr;
+    }
+}
+$repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -106,6 +122,54 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
 <link rel="stylesheet" href="assets/css/inventario_admin.css?v=<?php echo time(); ?>">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
 <script src="assets/js/admin_menu.js" defer></script>
+<style>
+  /* ── Inline repartidor select ── */
+  .rep-select {
+    width: 100%;
+    min-width: 130px;
+    height: 34px;
+    border: 1px solid rgba(213, 164, 112, 0.4);
+    border-radius: 10px;
+    background: #fffaf7;
+    color: #462800;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 10px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23996e3f'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 26px;
+  }
+  .rep-select:hover {
+    border-color: #ff8a00;
+    background-color: #fff7ef;
+  }
+  .rep-select:focus {
+    border-color: #ff8a00;
+    box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.14);
+    background-color: white;
+  }
+  .rep-select.saving {
+    border-color: #1786ba;
+    background-color: #f0f8ff;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+  .rep-select.saved {
+    border-color: #176a21;
+    background-color: #f0fff3;
+  }
+  .rep-select.error-save {
+    border-color: #b02500;
+    background-color: #fff4f2;
+  }
+</style>
 </head>
 
 <body>
@@ -288,7 +352,24 @@ $countPedidos = $resultPedidos ? $resultPedidos->num_rows : 0;
             <div><div class="text-10">#PED-<?php echo str_pad($row["id"], 3, "0", STR_PAD_LEFT); ?></div></div>
             <div><div class="text-11" style="font-weight: 700;"><?php echo htmlspecialchars($row["nombre_cliente"] ?? "Cliente Anónimo"); ?></div></div>
             <div><div class="text-12"><?php echo htmlspecialchars($row["direccion_cliente"] ?? "Sin dirección de entrega"); ?></div></div>
-            <div><div class="text-14"><?php echo htmlspecialchars($row["nombre_repartidor"] ?? "No asignado"); ?></div></div>
+            <div>
+              <?php
+              $currentRepId = $row["repartidor_id"] ? (int)$row["repartidor_id"] : '';
+              ?>
+              <select
+                class="rep-select"
+                id="rep-select-<?php echo $row['id']; ?>"
+                onchange="asignarRepartidor(<?php echo $row['id']; ?>, this)"
+                title="Cambiar repartidor asignado"
+              >
+                <option value=""<?php echo $currentRepId === '' ? ' selected' : ''; ?>>— Sin asignar —</option>
+                <?php foreach ($repartidoresJS as $rr): ?>
+                  <option value="<?php echo $rr['id']; ?>"<?php echo ((int)$rr['id'] === $currentRepId) ? ' selected' : ''; ?>>
+                    <?php echo htmlspecialchars($rr['nombre']); ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
             <div>
               <div class="<?php echo $estadoClass; ?>">
                 <div class="<?php echo $bgClass; ?>"></div>
@@ -557,6 +638,46 @@ function confirmarEliminar(id) {
 
 function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
+}
+
+/**
+ * Asigna un repartidor activo al pedido de forma inmediata vía AJAX.
+ * Muestra feedback visual en el propio select (azul → guardando, verde → OK, rojo → error).
+ */
+function asignarRepartidor(pedidoId, selectEl) {
+    const repartidorId = selectEl.value;
+
+    // Feedback visual: guardando
+    selectEl.classList.remove('saved', 'error-save');
+    selectEl.classList.add('saving');
+    selectEl.disabled = true;
+
+    const body = new FormData();
+    body.append('accion', 'asignar_repartidor');
+    body.append('id', pedidoId);
+    body.append('repartidor_id', repartidorId);
+
+    fetch('forms/logistica_acciones.php', { method: 'POST', body })
+        .then(r => r.json())
+        .then(res => {
+            selectEl.classList.remove('saving');
+            selectEl.disabled = false;
+            if (res.status === 'success') {
+                selectEl.classList.add('saved');
+                setTimeout(() => selectEl.classList.remove('saved'), 2000);
+            } else {
+                selectEl.classList.add('error-save');
+                setTimeout(() => selectEl.classList.remove('error-save'), 3000);
+                alert('Error al asignar repartidor: ' + res.message);
+            }
+        })
+        .catch(() => {
+            selectEl.classList.remove('saving');
+            selectEl.disabled = false;
+            selectEl.classList.add('error-save');
+            setTimeout(() => selectEl.classList.remove('error-save'), 3000);
+            alert('Error de comunicación con el servidor.');
+        });
 }
 
 // Búsqueda y filtros interactivos con paginación

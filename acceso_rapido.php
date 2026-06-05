@@ -5,6 +5,17 @@ if (isset($_GET['rol'])) {
     $rol = (int)$_GET['rol'];
     $_SESSION['rol_id'] = $rol;
     
+    if ($rol === 1) {
+        $_SESSION['admin_session'] = [
+            "usuario_id" => 7,
+            "usuario" => "JorgeL",
+            "rol_id" => 1,
+            "nombre" => "jorge",
+            "apellido" => "vazquez",
+            "email" => "jorge@ecoali.com"
+        ];
+    }
+    
     switch ($rol) {
         case 1:
             $_SESSION['usuario_id'] = 7;

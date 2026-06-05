@@ -2,17 +2,23 @@
 session_start();
 require "forms/conexion.php";
 
-if (!isset($_SESSION["usuario_id"])) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Location: login.php");
+        exit;
+    }
 }
 
-if ((int)$_SESSION["rol_id"] !== 1) {
-    header("Location: login.php");
-    exit;
-}
-
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 
 // --- CONSULTAS DINÁMICAS EN TIEMPO REAL ---
 
@@ -34,7 +40,7 @@ $ventasTotRow = $ventasTotRes ? $ventasTotRes->fetch_row() : null;
 $ventasTotales = $ventasTotRow && !is_null($ventasTotRow[0]) ? (float)$ventasTotRow[0] : 0.0;
 
 // 5. Stock Total de Huevos (disponibles en inventario)
-$stockTotRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE estado = 'disponible'");
+$stockTotRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock')");
 $stockTotRow = $stockTotRes ? $stockTotRes->fetch_row() : null;
 $stockTotal = $stockTotRow && !is_null($stockTotRow[0]) ? (int)$stockTotRow[0] : 0;
 
@@ -70,11 +76,11 @@ if ($produccionMensual === 0) {
 }
 
 // 10. Stock Bajo (lotes disponibles con menos de 100 huevos)
-$stockBajoRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado = 'disponible' AND cantidad < 100");
+$stockBajoRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND cantidad < 100");
 $stockBajoLotes = $stockBajoRes ? $stockBajoRes->fetch_row()[0] : 0;
 
 // 11. Lotes Próximos a Caducar (en los próximos 7 días)
-$proxCadRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado = 'disponible' AND fecha_caducidad <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND fecha_caducidad >= CURDATE()");
+$proxCadRes = $conn->query("SELECT COUNT(*) FROM inventario_huevos WHERE estado IN ('disponible', 'bajo_stock') AND fecha_caducidad <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND fecha_caducidad >= CURDATE()");
 $lotesProximosCaducar = $proxCadRes ? $proxCadRes->fetch_row()[0] : 0;
 
 // --- DETECCIÓN DE PROBLEMAS RÁPIDOS (ALERTAS) ---
@@ -85,7 +91,8 @@ $alertas = [];
 if ($stockBajoLotes > 0) {
     $alertas[] = [
         "tipo" => "warning",
-        "mensaje" => "Hay <strong>$stockBajoLotes lote(s)</strong> con bajo stock de huevos (menos de 100 unidades). Se recomienda reabastecer."
+        "mensaje" => "Hay <strong>$stockBajoLotes lote(s)</strong> con bajo stock de huevos (menos de 100 unidades). Se recomienda reabastecer.",
+        "url" => "inventario_admin.php"
     ];
 }
 
@@ -95,7 +102,8 @@ $lotesCaducados = $caducadosRes ? $caducadosRes->fetch_row()[0] : 0;
 if ($lotesCaducados > 0) {
     $alertas[] = [
         "tipo" => "danger",
-        "mensaje" => "¡Atención! Se detectaron <strong>$lotesCaducados lote(s) caducados</strong> en almacén que requieren ser bloqueados."
+        "mensaje" => "¡Atención! Se detectaron <strong>$lotesCaducados lote(s) caducados</strong> en almacén que requieren ser bloqueados.",
+        "url" => "inventario_admin.php"
     ];
 }
 
@@ -105,7 +113,8 @@ $entregasRetrasadas = $retrasadosRes ? $retrasadosRes->fetch_row()[0] : 0;
 if ($entregasRetrasadas > 0) {
     $alertas[] = [
         "tipo" => "danger",
-        "mensaje" => "Alerta: Tienes <strong>$entregasRetrasadas pedido(s) pendiente(s) retrasado(s)</strong> con más de 48 horas sin despachar."
+        "mensaje" => "Alerta: Tienes <strong>$entregasRetrasadas pedido(s) pendiente(s) retrasado(s)</strong> con más de 48 horas sin despachar.",
+        "url" => "logistica_admin.php"
     ];
 }
 
@@ -113,7 +122,8 @@ if ($entregasRetrasadas > 0) {
 if ($pedidosPendientes > 0 && count($alertas) < 3) {
     $alertas[] = [
         "tipo" => "info",
-        "mensaje" => "Hay <strong>$pedidosPendientes pedido(s) pendiente(s)</strong> esperando asignación de repartidor."
+        "mensaje" => "Hay <strong>$pedidosPendientes pedido(s) pendiente(s)</strong> esperando asignación de repartidor.",
+        "url" => "logistica_admin.php"
     ];
 }
 
@@ -231,11 +241,14 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
                     $alertClass = "alert-info-custom";
                     $icon = "ℹ";
                 }
+                $hasUrl = isset($alt["url"]);
+                $tag = $hasUrl ? "a" : "div";
+                $attr = $hasUrl ? 'href="' . htmlspecialchars($alt["url"]) . '" class="alert ' . $alertClass . ' alert-clickable" style="margin-bottom: 8px;"' : 'class="alert ' . $alertClass . '" style="margin-bottom: 8px;"';
             ?>
-                <div class="alert <?php echo $alertClass; ?>" style="margin-bottom: 8px;">
+                <<?php echo $tag; ?> <?php echo $attr; ?>>
                     <span><?php echo $icon; ?></span> 
-                    <div style="font-size: 13px; font-weight: 600; font-family: inherit;"><?php echo $alt["mensaje"]; ?></div>
-                </div>
+                    <div style="font-size: 13px; font-weight: 600; font-family: inherit; color: inherit;"><?php echo $alt["mensaje"]; ?></div>
+                </<?php echo $tag; ?>>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
@@ -386,6 +399,19 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
     background: rgba(23, 134, 186, 0.12);
     color: #115c80;
     border: 1px solid rgba(23, 134, 186, 0.35);
+}
+.alert-clickable {
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+}
+.alert-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    filter: brightness(0.97);
+}
+.alert-clickable:active {
+    transform: translateY(0);
 }
 </style>
 </body>

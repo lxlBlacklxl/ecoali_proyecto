@@ -181,7 +181,7 @@ if (!function_exists('registrar_bitacora')) {
             session_start();
         }
         
-        $usuario_id = $_SESSION['usuario_id'] ?? 1; // ID 1 por defecto (ej. Admin inicial en CLI)
+        $usuario_id = $_SESSION["admin_session"]["usuario_id"] ?? $_SESSION['usuario_id'] ?? 1; // ID 1 por defecto (ej. Admin inicial en CLI)
         $fecha = date('Y-m-d');
         $hora = date('H:i:s');
         

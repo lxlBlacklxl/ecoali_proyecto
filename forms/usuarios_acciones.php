@@ -2,10 +2,21 @@
 session_start();
 require "conexion.php";
 
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    header("Content-Type: application/json");
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Content-Type: application/json");
+        echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
+        exit;
+    }
 }
 
 $accion = $_POST["accion"] ?? $_GET["accion"] ?? "";
@@ -99,7 +110,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if ($stmtUser->execute()) {
             // 2. Actualizar o insertar perfil en usuario_perfil
-            $checkPerfil = $conn->query("SELECT id FROM usuario_perfil WHERE usuario_id = $id");
+            $checkPerfil = $conn->query("SELECT usuario_id FROM usuario_perfil WHERE usuario_id = $id");
             if ($checkPerfil && $checkPerfil->num_rows > 0) {
                 $sqlPerfil = "UPDATE usuario_perfil SET nombre = ?, apellido = ?, direccion = ?, telefono = ?, email = ? WHERE usuario_id = ?";
                 $stmtPerfil = $conn->prepare($sqlPerfil);
@@ -123,7 +134,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif ($accion === "eliminar") {
         $id = (int)($_POST["id"] ?? 0);
 
-        if ($id <= 0 || $id === (int)$_SESSION["usuario_id"]) {
+        $admin_usuario_id = (int)($_SESSION["admin_session"]["usuario_id"] ?? $_SESSION["usuario_id"] ?? 0);
+        if ($id <= 0 || $id === $admin_usuario_id) {
             $_SESSION["mensaje_error"] = "ID de usuario inválido o intento de eliminar tu propia cuenta de administrador activa.";
             header("Location: ../usuarios_admin.php");
             exit;

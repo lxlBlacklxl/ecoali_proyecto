@@ -2,17 +2,23 @@
 session_start();
 require "forms/conexion.php";
 
-if (!isset($_SESSION["usuario_id"])) {
-    header("Location: login.php");
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Location: login.php");
+        exit;
+    }
 }
 
-if ((int)$_SESSION["rol_id"] !== 1) {
-    header("Location: login.php");
-    exit;
-}
-
-$nombre = $_SESSION["nombre"] ?? "Admin";
+$nombre = $_SESSION["admin_session"]["nombre"] ?? "Admin";
 
 // Calcular totales de catálogo
 $totalRes = $conn->query("SELECT COUNT(*) FROM productos");
@@ -28,7 +34,7 @@ $inactivosProductos = $inactivosRes ? $inactivosRes->fetch_row()[0] : 0;
 $queryList = "SELECT pr.*, 
                      COALESCE(SUM(ih.cantidad), 0) AS stock_disponible
               FROM productos pr
-              LEFT JOIN inventario_huevos ih ON pr.id = ih.producto_id AND ih.estado = 'disponible'
+              LEFT JOIN inventario_huevos ih ON pr.id = ih.producto_id AND ih.estado IN ('disponible', 'bajo_stock')
               GROUP BY pr.id
               ORDER BY pr.id DESC";
 $resultList = $conn->query($queryList);

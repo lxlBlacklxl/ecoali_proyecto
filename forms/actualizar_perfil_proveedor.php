@@ -18,8 +18,13 @@ require "conexion.php";
 header("Content-Type: application/json");
 
 // 4. CONTROL DE ACCESO - VALIDAR QUE EL USUARIO TIENE ROL DE PROVEEDOR (rol_id = 3)
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 3) {
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado para este perfil de usuario."]);
+if (!isset($_SESSION["usuario_id"])) {
+    echo json_encode(["status" => "error", "message" => "Tu sesión ha expirado. Por favor, inicia sesión de nuevo."]);
+    exit;
+}
+
+if ((int)$_SESSION["rol_id"] !== 3) {
+    echo json_encode(["status" => "error", "message" => "Acceso no autorizado: tu sesión activa no corresponde a un Proveedor. Por favor, recarga la página."]);
     exit;
 }
 

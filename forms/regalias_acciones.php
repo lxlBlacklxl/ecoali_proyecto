@@ -2,10 +2,21 @@
 session_start();
 require "conexion.php";
 
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    header("Content-Type: application/json");
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
-    exit;
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        header("Content-Type: application/json");
+        echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
+        exit;
+    }
 }
 
 $accion = $_POST["accion"] ?? $_GET["accion"] ?? "";

@@ -100,6 +100,17 @@ $_SESSION["nombre"] = $user["nombre"];
 $_SESSION["apellido"] = $user["apellido"];
 $_SESSION["email"] = $user["email"];
 
+if ((int)$user["rol_id"] === 1) {
+    $_SESSION["admin_session"] = [
+        "usuario_id" => $user["id"],
+        "usuario" => $user["usuario"],
+        "rol_id" => $user["rol_id"],
+        "nombre" => $user["nombre"],
+        "apellido" => $user["apellido"],
+        "email" => $user["email"]
+    ];
+}
+
 switch ((int)$user["rol_id"]) {
     case 1:
         header("Location: ../dashboard_admin.php");

@@ -15,8 +15,13 @@ require "conexion.php";
 header("Content-Type: application/json");
 
 // 1. CONTROL DE ACCESO
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 2) {
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado."]);
+if (!isset($_SESSION["usuario_id"])) {
+    echo json_encode(["status" => "error", "message" => "Tu sesión ha expirado. Por favor, inicia sesión de nuevo."]);
+    exit;
+}
+
+if ((int)$_SESSION["rol_id"] !== 2) {
+    echo json_encode(["status" => "error", "message" => "Acceso no autorizado: tu sesión activa no corresponde a un Cliente. Por favor, recarga la página."]);
     exit;
 }
 
@@ -77,7 +82,7 @@ try {
         }
 
         // Calcular stock disponible actual en lotes para este producto
-        $stmtStock = $conn->prepare("SELECT SUM(cantidad) FROM inventario_huevos WHERE producto_id = ? AND estado = 'disponible' AND cantidad > 0");
+        $stmtStock = $conn->prepare("SELECT SUM(cantidad) FROM inventario_huevos WHERE producto_id = ? AND estado IN ('disponible', 'bajo_stock') AND cantidad > 0");
         $stmtStock->bind_param("i", $prod_id);
         $stmtStock->execute();
         $resStock = $stmtStock->get_result();
@@ -106,7 +111,7 @@ try {
         $prod_id = $item["id"];
         $rem = $item["cantidad"];
 
-        $stmtLotes = $conn->prepare("SELECT id, cantidad FROM inventario_huevos WHERE producto_id = ? AND estado = 'disponible' AND cantidad > 0 ORDER BY fecha_postura ASC");
+        $stmtLotes = $conn->prepare("SELECT id, cantidad FROM inventario_huevos WHERE producto_id = ? AND estado IN ('disponible', 'bajo_stock') AND cantidad > 0 ORDER BY fecha_postura ASC");
         $stmtLotes->bind_param("i", $prod_id);
         $stmtLotes->execute();
         $resLotes = $stmtLotes->get_result();

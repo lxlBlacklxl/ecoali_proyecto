@@ -13,8 +13,13 @@ require "conexion.php";
 header("Content-Type: application/json");
 
 // 1. CONTROL DE ACCESO - Solo proveedores autorizados (rol_id = 3)
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 3) {
-    echo json_encode(["status" => "error", "message" => "Acceso denegado. Perfil no autorizado."]);
+if (!isset($_SESSION["usuario_id"])) {
+    echo json_encode(["status" => "error", "message" => "Tu sesión ha expirado. Por favor, inicia sesión de nuevo."]);
+    exit;
+}
+
+if ((int)$_SESSION["rol_id"] !== 3) {
+    echo json_encode(["status" => "error", "message" => "Acceso denegado: tu sesión activa no corresponde al perfil de Proveedor. Por favor, recarga la página."]);
     exit;
 }
 

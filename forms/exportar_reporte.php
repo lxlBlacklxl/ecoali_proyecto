@@ -11,8 +11,19 @@ session_start();
 require "conexion.php";
 
 // 1. CONTROL DE ACCESO - VALIDAR ADMINISTRADOR
-if (!isset($_SESSION["usuario_id"]) || (int)$_SESSION["rol_id"] !== 1) {
-    die("Acceso no autorizado.");
+if (!isset($_SESSION["admin_session"])) {
+    if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
+        $_SESSION["admin_session"] = [
+            "usuario_id" => $_SESSION["usuario_id"],
+            "usuario" => $_SESSION["usuario"] ?? "admin",
+            "rol_id" => $_SESSION["rol_id"],
+            "nombre" => $_SESSION["nombre"] ?? "Admin",
+            "apellido" => $_SESSION["apellido"] ?? "",
+            "email" => $_SESSION["email"] ?? ""
+        ];
+    } else {
+        die("Acceso no autorizado.");
+    }
 }
 
 $formato = trim($_GET["formato"] ?? "excel");
@@ -303,7 +314,7 @@ if ($formato === "pdf") {
             </div>
             <div class="meta-item">
                 <strong>Generado Por</strong>
-                Administrador EcoAli (<?php echo htmlspecialchars($_SESSION["nombre"] ?? "Admin"); ?>)
+                Administrador EcoAli (<?php echo htmlspecialchars($_SESSION["admin_session"]["nombre"] ?? $_SESSION["nombre"] ?? "Admin"); ?>)
             </div>
             <div class="meta-item">
                 <strong>Fecha Emisión</strong>
