@@ -96,7 +96,7 @@ $sqlPedidosList = "SELECT p.*,
                           upc.direccion AS direccion_cliente,
                           CONCAT(upr.nombre, ' ', upr.apellido) AS nombre_repartidor,
                           CASE
-                            WHEN p.estado IN ('pendiente','en_ruta')
+                            WHEN p.estado IN ('pendiente','preparado')
                               AND p.fecha_pedido < NOW() - INTERVAL 24 HOUR
                             THEN 1
                             ELSE 0
@@ -191,12 +191,107 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
     0%, 100% { opacity: 1; }
     50%       { opacity: .45; }
   }
+  /* Animación entrada de nueva fila inyectada por AJAX */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
   /* Texto de la fila atrasada en rojo oscuro */
   .row-atrasado .text-10,
   .row-atrasado .text-11,
   .row-atrasado .text-12,
   .row-atrasado .text-14 {
     color: #7a1a00 !important;
+  }
+
+  /* ── Botón Atrasados: mantener texto rojo en ambos estados ── */
+  .btn-atrasados { border-color: rgba(176,37,0,0.35) !important; }
+  .btn-atrasados .text,
+  .btn-atrasados .text-2 { color: #b02500 !important; font-weight: 800 !important; }
+  .btn-atrasados.button  { background: rgba(176,37,0,0.10) !important; }
+
+  /* ── Panel de asignación rápida (solo visible en filtro Atrasados) ── */
+  #panel-asignar-atrasados {
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, rgba(176,37,0,0.07) 0%, rgba(255,76,28,0.04) 100%);
+    border: 1.5px solid rgba(176,37,0,0.30);
+    border-radius: 16px;
+    padding: 18px 24px;
+    flex-direction: column;
+    gap: 10px;
+    animation: fadeInRow .3s ease-out;
+  }
+  .panel-atrasados-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .panel-atrasados-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #b02500;
+    letter-spacing: .3px;
+  }
+  .panel-atrasados-desc {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7a1a00;
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .panel-atrasados-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .rep-select-masivo {
+    min-width: 230px;
+    height: 40px;
+    border: 1.5px solid rgba(176,37,0,0.35);
+    border-radius: 10px;
+    background: #fff8f7;
+    color: #462800;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 14px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23b02500'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 30px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .rep-select-masivo:hover { border-color: #b02500; background-color: #fff4f2; }
+  .rep-select-masivo:focus { border-color: #b02500; box-shadow: 0 0 0 3px rgba(176,37,0,.14); }
+  .btn-asignar-masivo {
+    height: 40px;
+    padding: 0 22px;
+    background: linear-gradient(90deg, #b02500, #ff4c1c);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s, transform .15s;
+    box-shadow: 0 8px 20px rgba(176,37,0,0.22);
+    white-space: nowrap;
+  }
+  .btn-asignar-masivo:hover  { opacity: .88; transform: translateY(-1px); }
+  .btn-asignar-masivo:active { transform: translateY(0); }
+  #panel-atrasados-feedback {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid;
   }
 </style>
 </head>
@@ -311,6 +406,7 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
           <button class="div-wrapper" onclick="filtrarEstado('en_ruta', this)"><div class="text-2">En ruta</div></button>
           <button class="div-wrapper" onclick="filtrarEstado('entregado', this)"><div class="text-2">Entregado</div></button>
           <button class="div-wrapper" onclick="filtrarEstado('cancelado', this)"><div class="text-2">Cancelado</div></button>
+          <button class="div-wrapper btn-atrasados" onclick="filtrarEstado('atrasado', this)" style="border-color: rgba(176,37,0,0.35); position:relative;"><div class="text-2" style="color:#b02500;">⚠ Atrasados</div></button>
         </div>
       </div>
     </div>
@@ -318,22 +414,43 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
     <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
       <div class="background-border">
         <div class="container-5"><div class="text-wrapper-2">Pedidos Totales</div></div>
-        <div class="div-2"><div class="text-wrapper-3"><?php echo $pedidosTotales; ?></div></div>
+        <div class="div-2"><div class="text-wrapper-3" id="contador-totales"><?php echo $pedidosTotales; ?></div></div>
       </div>
 
       <div class="background-border-2">
         <div class="container-5"><div class="text-wrapper-2">Pedidos Pendientes</div></div>
-        <div class="div-2"><div class="text-wrapper-3"><?php echo $pedidosPendientes; ?></div></div>
+        <div class="div-2"><div class="text-wrapper-3" id="contador-pendientes"><?php echo $pedidosPendientes; ?></div></div>
       </div>
 
       <div class="background-border-3">
         <div class="container-5"><div class="text-wrapper-2">Pedidos En Ruta</div></div>
-        <div class="div-2"><div class="text-wrapper-3"><?php echo $pedidosEnRuta; ?></div></div>
+        <div class="div-2"><div class="text-wrapper-3" id="contador-en-ruta"><?php echo $pedidosEnRuta; ?></div></div>
       </div>
 
       <div class="background-border-2" style="border-color: rgba(23, 106, 33, 0.25);">
         <div class="container-5"><div class="text-wrapper-2" style="color: #176a21;">Pedidos Entregados</div></div>
-        <div class="div-2"><div class="text-wrapper-3" style="color: #176a21;"><?php echo $pedidosEntregados; ?></div></div>
+        <div class="div-2"><div class="text-wrapper-3" style="color: #176a21;" id="contador-entregados"><?php echo $pedidosEntregados; ?></div></div>
+      </div>
+    </div>
+
+    <!-- ══ Panel de asignación rápida — solo visible con filtro Atrasados ══ -->
+    <div id="panel-asignar-atrasados" style="display:none;">
+      <div class="panel-atrasados-header">
+        <span style="font-size:22px;">⚠️</span>
+        <span class="panel-atrasados-title">Pedidos Atrasados — Asignación Rápida de Repartidor</span>
+      </div>
+      <div class="panel-atrasados-desc">
+        Estos pedidos superaron las 24 horas sin ser atendidos. Selecciona un repartidor y asígnalo a todos de inmediato:
+      </div>
+      <div class="panel-atrasados-controls">
+        <select id="rep-masivo-atrasados" class="rep-select-masivo">
+          <option value="">🔍 Seleccionar repartidor...</option>
+          <?php foreach ($repartidoresJS as $rr): ?>
+            <option value="<?php echo $rr['id']; ?>"><?php echo htmlspecialchars($rr['nombre']); ?></option>
+          <?php endforeach; ?>
+        </select>
+        <button onclick="asignarRepartidorAtrasados()" class="btn-asignar-masivo">📦 Asignar a todos los atrasados</button>
+        <div id="panel-atrasados-feedback" style="display:none;"></div>
       </div>
     </div>
 
@@ -378,16 +495,16 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
               }
           ?>
           <?php 
-              $esAtrasado = !empty($row['es_atrasado']) && (int)$row['es_atrasado'] === 1;
+              $esAntiguo = strtotime($row['fecha_pedido']) < (time() - 24 * 3600);
+              $esAtrasado = $esAntiguo && ($estado === 'pendiente' || $estado === 'preparado');
               $rowExtraClass = $esAtrasado ? ' row-atrasado' : '';
               $rowAtrasadoData = $esAtrasado ? ' data-atrasado="1"' : '';
+              $rowAntiguoData = $esAntiguo ? ' data-antiguo="1"' : '';
           ?>
-          <div class="div-3 row-pedido<?php echo $rowExtraClass; ?>" data-estado="<?php echo $estado; ?>"<?php echo $rowAtrasadoData; ?> style="grid-template-columns: 1fr 1.8fr 2.5fr 1.8fr 1.2fr 1.8fr 1.2fr 1.3fr; border-bottom: 1px solid rgba(213,164,112,.12);">
+          <div class="div-3 row-pedido<?php echo $rowExtraClass; ?>" data-estado="<?php echo $estado; ?>" data-cliente-id="<?php echo $row['cliente_id']; ?>"<?php echo $rowAtrasadoData; ?><?php echo $rowAntiguoData; ?> style="grid-template-columns: 1fr 1.8fr 2.5fr 1.8fr 1.2fr 1.8fr 1.2fr 1.3fr; border-bottom: 1px solid rgba(213,164,112,.12);">
             <div><div class="text-10">
-              #PED-<?php echo str_pad($row["id"], 3, "0", STR_PAD_LEFT); ?>
-              <?php if ($esAtrasado): ?>
-                <span class="badge-atrasado">⚠ ATRASADO</span>
-              <?php endif; ?>
+               #PED-<?php echo str_pad($row["id"], 3, "0", STR_PAD_LEFT); ?>
+               <span class="badge-atrasado" style="<?php echo $esAtrasado ? '' : 'display:none;'; ?>">⚠ ATRASADO</span>
             </div></div>
             <div><div class="text-11" style="font-weight: 700;"><?php echo htmlspecialchars($row["nombre_cliente"] ?? "Cliente Anónimo"); ?></div></div>
             <div><div class="text-12"><?php echo htmlspecialchars($row["direccion_cliente"] ?? "Sin dirección de entrega"); ?></div></div>
@@ -400,6 +517,7 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
                 id="rep-select-<?php echo $row['id']; ?>"
                 onchange="asignarRepartidor(<?php echo $row['id']; ?>, this)"
                 title="Cambiar repartidor asignado"
+                <?php echo ($estado === 'cancelado') ? 'disabled' : ''; ?>
               >
                 <option value=""<?php echo $currentRepId === '' ? ' selected' : ''; ?>>— Sin asignar —</option>
                 <?php foreach ($repartidoresJS as $rr): ?>
@@ -504,12 +622,12 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
       <div class="modal-title">Asignar / Crear Pedido</div>
       <button class="modal-close" onclick="cerrarModal('modalCrear')">×</button>
     </div>
-    <form action="forms/logistica_acciones.php" method="POST">
+    <form id="formCrearPedido">
       <input type="hidden" name="accion" value="crear">
-      
+
       <div class="form-group">
         <label class="form-label">Cliente *</label>
-        <select name="cliente_id" class="form-select" required>
+        <select name="cliente_id" id="crear_cliente_id" class="form-select" required onchange="cargarPedidosCliente(this.value)">
           <option value="">Seleccione un cliente...</option>
           <?php if ($clientesSelect && $clientesSelect->num_rows > 0): ?>
               <?php while ($c = $clientesSelect->fetch_assoc()): ?>
@@ -517,28 +635,58 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
               <?php endwhile; ?>
           <?php endif; ?>
         </select>
+        <!-- Alerta en tiempo real de pedidos activos del cliente -->
+        <div id="cli-pedidos-info" style="
+            display:none;
+            margin-top:8px;
+            padding:10px 14px;
+            border-radius:10px;
+            background:#fff7ef;
+            border:1px solid rgba(255,138,0,0.22);
+            font-size:12px;
+            font-weight:700;
+            color:#7a4500;
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+        ">
+        </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Repartidor (Opcional)</label>
-        <select name="repartidor_id" class="form-select">
-          <option value="">No asignado</option>
+        <select name="repartidor_id" id="crear_repartidor_id" class="form-select"
+                onchange="cargarPedidosRepartidor(this.value)">
+          <option value="">— Sin asignar —</option>
           <?php if ($repartidoresSelect && $repartidoresSelect->num_rows > 0): ?>
               <?php while ($r = $repartidoresSelect->fetch_assoc()): ?>
                   <option value="<?php echo $r['id']; ?>"><?php echo htmlspecialchars($r['nombre']); ?></option>
               <?php endwhile; ?>
           <?php endif; ?>
         </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Total del Pedido ($) *</label>
-        <input type="number" step="0.01" name="total" class="form-input" required placeholder="Ej. 45.50">
+        <!-- Contador en tiempo real de pedidos activos del repartidor -->
+        <div id="rep-pedidos-info" style="
+            display:none;
+            margin-top:8px;
+            padding:10px 14px;
+            border-radius:10px;
+            background:#fff7ef;
+            border:1px solid rgba(255,138,0,0.22);
+            font-size:12px;
+            font-weight:700;
+            color:#7a4500;
+            display:flex;
+            align-items:center;
+            gap:8px;
+        ">
+          <span style="font-size:18px;">📦</span>
+          <span id="rep-pedidos-texto">...</span>
+        </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Estado de Logística</label>
-        <select name="estado" class="form-select">
+        <select name="estado" id="crear_estado" class="form-select">
           <option value="pendiente" selected>Pendiente</option>
           <option value="preparado">Preparado</option>
           <option value="en_ruta">En Ruta</option>
@@ -547,9 +695,11 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
         </select>
       </div>
 
+      <div id="crear-msg" style="display:none; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; margin-bottom:10px;"></div>
+
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="cerrarModal('modalCrear')">Cancelar</button>
-        <button type="submit" class="btn-submit">Asignar Pedido</button>
+        <button type="submit" class="btn-submit" id="btn-crear-submit">Asignar Pedido</button>
       </div>
     </form>
   </div>
@@ -645,8 +795,420 @@ function abrirModalImprimir() {
 }
 
 function abrirModalCrear() {
+    // Reset form
+    document.getElementById('formCrearPedido').reset();
+    const info = document.getElementById('rep-pedidos-info');
+    info.style.display = 'none';
+    const cliInfo = document.getElementById('cli-pedidos-info');
+    if (cliInfo) cliInfo.style.display = 'none';
+    const msg = document.getElementById('crear-msg');
+    msg.style.display = 'none';
+    document.getElementById('btn-crear-submit').disabled = false;
     document.getElementById('modalCrear').classList.add('active');
 }
+
+/** Carga en tiempo real: muestra solo pedidos PENDIENTES del cliente, atrasados primero */
+function cargarPedidosCliente(clienteId) {
+    const info = document.getElementById('cli-pedidos-info');
+    if (!info) return;
+    if (!clienteId) { info.style.display = 'none'; return; }
+
+    info.style.display = 'flex';
+    info.innerHTML = '<span style="color: #7a4500;">Consultando pedidos pendientes del cliente...</span>';
+    
+    const selectCli = document.getElementById('crear_cliente_id');
+    const clienteNombre = selectCli.options[selectCli.selectedIndex].text;
+
+    fetch('forms/logistica_acciones.php?accion=pedidos_cliente&cliente_id=' + clienteId)
+        .then(r => r.json())
+        .then(res => {
+            if (res.status !== 'success' || res.count === 0) {
+                // Sin pedidos pendientes
+                info.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; color:#176a21;">
+                        <span style="font-size:16px;">✅</span>
+                        <span>${clienteNombre} no tiene pedidos pendientes por asignar.</span>
+                    </div>`;
+                info.style.background = '#f0fff3';
+                info.style.borderColor = 'rgba(23,106,33,0.25)';
+                info.style.color = '#176a21';
+                return;
+            }
+
+            // Separar atrasados y normales
+            const atrasados = res.pedidos.filter(p => p.es_atrasado);
+            const normales  = res.pedidos.filter(p => !p.es_atrasado);
+
+            const headerColor  = atrasados.length > 0 ? '#b02500' : '#7a4500';
+            const headerIcon   = atrasados.length > 0 ? '⚠️' : 'ℹ️';
+            const headerBg     = atrasados.length > 0 ? '#fff4f2' : '#fffaf7';
+            const headerBorder = atrasados.length > 0 ? 'rgba(176,37,0,0.25)' : 'rgba(213,164,112,0.25)';
+
+            let html = `
+                <div style="display:flex; align-items:center; gap:8px; color:${headerColor}; font-size:13px; margin-bottom:6px;">
+                    <span style="font-size:18px;">${headerIcon}</span>
+                    <span>
+                        <strong>${clienteNombre}</strong> tiene
+                        <strong>${res.count} pedido${res.count !== 1 ? 's' : ''} pendiente${res.count !== 1 ? 's' : ''}</strong>
+                        ${atrasados.length > 0 ? `— <span style="color:#b02500; font-weight:800;">⚠ ${atrasados.length} ATRASADO${atrasados.length !== 1 ? 'S' : ''} (prioridad alta)</span>` : ''}
+                    </span>
+                </div>`;
+
+            // Listar atrasados primero con fondo rojo
+            if (atrasados.length > 0) {
+                html += `<div style="font-size:11px; font-weight:800; color:#b02500; margin-bottom:3px; letter-spacing:.3px;">🔴 ATRASADOS — PRIORIDAD MÁXIMA</div>
+                         <ul style="margin:0 0 6px 0; padding-left:18px; font-size:11px; color:#7a1a00;">`;
+                atrasados.forEach(p => {
+                    const totalFmt = parseFloat(p.total).toFixed(2);
+                    const fechaF   = new Date(p.fecha_pedido).toLocaleDateString('es-MX',
+                        {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                    html += `<li style="margin-bottom:2px;">
+                                <strong>#PED-${String(p.id).padStart(3,'0')}</strong>
+                                <span style="background:#b02500;color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:999px;margin:0 4px;">ATRASADO</span>
+                                Fecha: ${fechaF} · $${totalFmt}
+                             </li>`;
+                });
+                html += `</ul>`;
+            }
+
+            // Listar pendientes normales
+            if (normales.length > 0) {
+                html += `<div style="font-size:11px; font-weight:700; color:#7a4500; margin-bottom:3px;">🟡 PENDIENTES</div>
+                         <ul style="margin:0 0 6px 0; padding-left:18px; font-size:11px; color:#7a4500;">`;
+                normales.forEach(p => {
+                    const totalFmt = parseFloat(p.total).toFixed(2);
+                    const fechaF   = new Date(p.fecha_pedido).toLocaleDateString('es-MX',
+                        {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                    html += `<li style="margin-bottom:2px;">
+                                <strong>#PED-${String(p.id).padStart(3,'0')}</strong>
+                                Fecha: ${fechaF} · $${totalFmt}
+                             </li>`;
+                });
+                html += `</ul>`;
+            }
+
+            // Botón para ver en tabla
+            html += `
+                <div style="margin-top:6px;">
+                    <button type="button" onclick="verPedidosDeCliente('${clienteNombre.replace(/'/g, "\\'")}')" style="
+                        background:#ff8a00; color:white; border:none; padding:5px 12px;
+                        border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:background .2s;"
+                        onmouseover="this.style.background='#e07b00'" onmouseout="this.style.background='#ff8a00'">
+                        🔍 Ver en tabla principal
+                    </button>
+                    ${atrasados.length > 0 ? `<button type="button" onclick="filtrarAtrasadosYCerrar()" style="
+                        background:#b02500; color:white; border:none; padding:5px 12px;
+                        border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; margin-left:6px; transition:background .2s;"
+                        onmouseover="this.style.background='#8c1d00'" onmouseout="this.style.background='#b02500'">
+                        ⚠ Ver solo atrasados
+                    </button>` : ''}
+                </div>`;
+
+            info.innerHTML = html;
+            info.style.background  = headerBg;
+            info.style.borderColor = headerBorder;
+            info.style.color       = headerColor;
+        })
+        .catch(() => {
+            info.innerHTML = '<span style="color: #b02500;">Error al consultar pedidos del cliente.</span>';
+        });
+}
+
+/** Cierra el modal y aplica filtro 'atrasado' en la tabla */
+function filtrarAtrasadosYCerrar() {
+    cerrarModal('modalCrear');
+    // Activar botón de atrasados en la barra de filtros
+    const btns = document.querySelectorAll('.background-shadow button');
+    btns.forEach(b => {
+        b.className = 'div-wrapper';
+        if (b.querySelector('div')) b.querySelector('div').className = 'text-2';
+    });
+    const btnAtrasados = document.querySelector('.btn-atrasados');
+    if (btnAtrasados) {
+        btnAtrasados.className = 'button btn-atrasados';
+        if (btnAtrasados.querySelector('div')) btnAtrasados.querySelector('div').className = 'text';
+        btnAtrasados.querySelector('div').style.color = '#b02500';
+    }
+    filtroEstado = 'atrasado';
+    paginaActual = 1;
+    actualizarVista();
+}
+
+/** Cierra el modal y escribe el nombre del cliente en el input de búsqueda para filtrar */
+function verPedidosDeCliente(clienteNombre) {
+    cerrarModal('modalCrear');
+    const buscarInput = document.getElementById('buscarPedido');
+    if (buscarInput) {
+        buscarInput.value = clienteNombre;
+        filtrarTabla();
+    }
+}
+
+/** Carga en tiempo real cuántos pedidos activos tiene el repartidor seleccionado */
+function cargarPedidosRepartidor(repId) {
+    const info  = document.getElementById('rep-pedidos-info');
+    const texto = document.getElementById('rep-pedidos-texto');
+    if (!repId) { info.style.display = 'none'; return; }
+
+    texto.textContent = 'Consultando...';
+    info.style.display = 'flex';
+
+    fetch('forms/logistica_acciones.php?accion=pedidos_repartidor&rep_id=' + repId)
+        .then(r => r.json())
+        .then(res => {
+            const n = res.count ?? 0;
+            const repName = document.getElementById('crear_repartidor_id')
+                              .options[document.getElementById('crear_repartidor_id').selectedIndex].text;
+            if (n === 0) {
+                texto.textContent = repName + ' no tiene pedidos activos asignados. ✅';
+                info.style.background = '#f0fff3';
+                info.style.borderColor = 'rgba(23,106,33,0.25)';
+                info.style.color = '#176a21';
+            } else {
+                texto.textContent = repName + ' tiene ' + n + ' pedido' + (n !== 1 ? 's' : '') + ' activo' + (n !== 1 ? 's' : '') + ' por entregar.';
+                info.style.background = '#fff7ef';
+                info.style.borderColor = 'rgba(255,138,0,0.3)';
+                info.style.color = '#7a4500';
+            }
+        })
+        .catch(() => { texto.textContent = 'No se pudo consultar la carga del repartidor.'; });
+}
+
+/** Submit AJAX del modal Crear — inyecta la fila en la tabla sin recargar */
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('formCrearPedido').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('btn-crear-submit');
+        const msg = document.getElementById('crear-msg');
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+        msg.style.display = 'none';
+
+        const body = new FormData(this);
+
+        fetch('forms/logistica_acciones.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body
+        })
+        .then(r => r.json())
+        .then(res => {
+            btn.disabled = false;
+            btn.textContent = 'Asignar Pedido';
+
+            if (res.status !== 'success') {
+                msg.textContent = '⚠ ' + (res.message || 'Error al crear el pedido.');
+                msg.style.display = 'block';
+                msg.style.background = '#fff4f2';
+                msg.style.color = '#b02500';
+                msg.style.border = '1px solid rgba(176,37,0,0.2)';
+                return;
+            }
+
+            // Cerrar modal y mostrar feedback
+            cerrarModal('modalCrear');
+            const p = res.pedido;
+
+            // Construir nueva fila y prependerla al tablaCuerpo
+            const padId = String(p.id).padStart(3, '0');
+            const fecha = new Date(p.fecha_pedido).toLocaleDateString('es-MX', {
+                day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
+            });
+            const repSelect = document.getElementById('crear_repartidor_id');
+            const repId     = repSelect.value;
+
+            // Construir opciones del select de repartidores para la nueva fila usando el listado oficial de PHP
+            const repartidores = <?php echo $repartidoresJSON; ?>;
+            let repOptionsHTML = '<option value="">— Sin asignar —</option>';
+            repartidores.forEach(rr => {
+                const selectedAttr = (String(rr.id) === String(repId)) ? ' selected' : '';
+                repOptionsHTML += `<option value="${rr.id}"${selectedAttr}>${rr.nombre}</option>`;
+            });
+
+            // Generar badge del estado dinámico
+            const estado = (p.estado || "pendiente").toLowerCase();
+            let estadoClass = "overlay-10";
+            let bgClass = "background-9";
+            let estadoText = "Pendiente";
+
+            if (estado === "preparado") {
+                estadoClass = "overlay-7";
+                bgClass = "background-5";
+                estadoText = "Preparado";
+            } else if (estado === "en_ruta") {
+                estadoClass = "overlay-7";
+                bgClass = "background-5";
+                estadoText = "En Ruta";
+            } else if (estado === "entregado") {
+                estadoClass = "overlay-6";
+                bgClass = "background-3";
+                estadoText = "Entregado";
+            } else if (estado === "cancelado") {
+                estadoClass = "overlay-9";
+                bgClass = "background-7";
+                estadoText = "Cancelado";
+            }
+
+            const formattedTotal = parseFloat(p.total || 0).toFixed(2);
+
+            const newRow = document.createElement('div');
+            newRow.className = 'div-3 row-pedido';
+            newRow.setAttribute('data-estado', estado);
+            newRow.setAttribute('data-cliente-id', p.cliente_id);
+            newRow.style.cssText = 'grid-template-columns: 1fr 1.8fr 2.5fr 1.8fr 1.2fr 1.8fr 1.2fr 1.3fr; border-bottom: 1px solid rgba(213,164,112,.12); animation: fadeInRow .4s ease-out;';
+            newRow.innerHTML = `
+              <div><div class="text-10">#PED-${padId} <span class="badge-atrasado" style="display:none;">⚠ ATRASADO</span></div></div>
+              <div><div class="text-11" style="font-weight:700;">${p.nombre_cliente || 'Cliente'}</div></div>
+              <div><div class="text-12">${p.direccion_cliente || 'Sin dirección'}</div></div>
+              <div>
+                <select class="rep-select" id="rep-select-${p.id}"
+                        onchange="asignarRepartidor(${p.id}, this)"
+                        title="Cambiar repartidor asignado"
+                        ${estado === 'cancelado' ? 'disabled' : ''}>
+                  ${repOptionsHTML}
+                </select>
+              </div>
+              <div>
+                <div class="${estadoClass}">
+                  <div class="${bgClass}"></div>
+                  <div class="text-15" style="color:inherit;">${estadoText}</div>
+                </div>
+              </div>
+              <div><div class="text-14">${fecha}</div></div>
+              <div>
+                <div class="background-2">
+                  <div class="text-13">$${formattedTotal}</div>
+                </div>
+              </div>
+              <div>
+                <div class="text-10" style="display:flex; gap:8px;">
+                  <button class="action-btn action-btn-edit" title="Gestionar Pedido"
+                          onclick="abrirModalEditar(${p.id})">✎</button>
+                  <button class="action-btn action-btn-delete" title="Cancelar Pedido"
+                          onclick="confirmarEliminar(${p.id})">🗑</button>
+                </div>
+              </div>`;
+
+            const cuerpo = document.getElementById('tablaCuerpo');
+            cuerpo.insertBefore(newRow, cuerpo.firstChild);
+
+            // Ajustar los contadores superiores de estado para los pedidos existentes de este cliente que van a cambiar
+            let diffPendientes = 0;
+            let diffEnRuta = 0;
+            let diffEntregados = 0;
+
+            document.querySelectorAll(`.row-pedido[data-cliente-id="${p.cliente_id}"]`).forEach(row => {
+                if (row !== newRow) {
+                    const oldEstado = row.getAttribute('data-estado');
+                    if (oldEstado === 'cancelado') {
+                        return; // Excluir pedidos que ya estaban cancelados
+                    }
+                    if (oldEstado !== estado) {
+                        // Decrementar del estado anterior
+                        if (oldEstado === 'pendiente') diffPendientes--;
+                        else if (oldEstado === 'en_ruta') diffEnRuta--;
+                        else if (oldEstado === 'entregado') diffEntregados--;
+
+                        // Incrementar en el nuevo estado
+                        if (estado === 'pendiente') diffPendientes++;
+                        else if (estado === 'en_ruta') diffEnRuta++;
+                        else if (estado === 'entregado') diffEntregados++;
+                    }
+                }
+            });
+
+            // Aplicar diferencias a los contadores en el DOM
+            if (diffPendientes !== 0) {
+                const el = document.getElementById('contador-pendientes');
+                if (el) el.textContent = parseInt(el.textContent || 0) + diffPendientes;
+            }
+            if (diffEnRuta !== 0) {
+                const el = document.getElementById('contador-en-ruta');
+                if (el) el.textContent = parseInt(el.textContent || 0) + diffEnRuta;
+            }
+            if (diffEntregados !== 0) {
+                const el = document.getElementById('contador-entregados');
+                if (el) el.textContent = parseInt(el.textContent || 0) + diffEntregados;
+            }
+
+            // Actualizar todos los selects, atributos data-estado y badges de estado de este cliente en la tabla
+            document.querySelectorAll(`.row-pedido[data-cliente-id="${p.cliente_id}"]`).forEach(row => {
+                if (row !== newRow && row.getAttribute('data-estado') === 'cancelado') {
+                    return; // Ignorar pedidos ya cancelados
+                }
+
+                // 1. Repartidor
+                const selectEl = row.querySelector('.rep-select');
+                if (selectEl) {
+                    selectEl.value = repId;
+                    if (estado === 'cancelado') {
+                        selectEl.disabled = true; // Desactivar si el nuevo estado es cancelado
+                    }
+                }
+
+                // 2. data-estado
+                row.setAttribute('data-estado', estado);
+
+                // 3. Badge
+                const statusContainer = row.children[4];
+                if (statusContainer) {
+                    statusContainer.innerHTML = `
+                        <div class="${estadoClass}">
+                          <div class="${bgClass}"></div>
+                          <div class="text-15" style="color:inherit;">${estadoText}</div>
+                        </div>
+                    `;
+                }
+
+                // 4. Actualizar estado "Atrasado" si es un pedido antiguo
+                if (row.getAttribute('data-antiguo') === '1') {
+                    const badgeAtrasado = row.querySelector('.badge-atrasado');
+                    if (estado === 'pendiente' || estado === 'preparado') {
+                        row.classList.add('row-atrasado');
+                        row.setAttribute('data-atrasado', '1');
+                        if (badgeAtrasado) badgeAtrasado.style.display = '';
+                    } else {
+                        row.classList.remove('row-atrasado');
+                        row.removeAttribute('data-atrasado');
+                        if (badgeAtrasado) badgeAtrasado.style.display = 'none';
+                    }
+                }
+            });
+
+            // Actualizar contadores superiores dinámicamente
+            const totEl = document.getElementById('contador-totales');
+            if (totEl) totEl.textContent = parseInt(totEl.textContent || 0) + 1;
+
+            let contId = '';
+            if (estado === 'pendiente') contId = 'contador-pendientes';
+            else if (estado === 'en_ruta') contId = 'contador-en-ruta';
+            else if (estado === 'entregado') contId = 'contador-entregados';
+
+            if (contId) {
+                const contEl = document.getElementById(contId);
+                if (contEl) contEl.textContent = parseInt(contEl.textContent || 0) + 1;
+            }
+
+            // Actualizar el contador de pedidos mostrados
+            const txt = document.getElementById('paginacionTexto');
+            if (txt) {
+                const current = parseInt(txt.textContent.match(/\d+/)?.[0] ?? 0);
+                txt.textContent = 'MOSTRANDO ' + (current + 1) + ' PEDIDOS';
+            }
+
+            actualizarVista();
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Asignar Pedido';
+            msg.textContent = '⚠ Error de comunicación con el servidor.';
+            msg.style.display = 'block';
+            msg.style.background = '#fff4f2';
+            msg.style.color = '#b02500';
+        });
+    });
+});
 
 function abrirModalEditar(id) {
     fetch('forms/logistica_acciones.php?accion=obtener&id=' + id)
@@ -730,11 +1292,21 @@ function actualizarVista() {
     const matchingRows = [];
     
     rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
+        const text    = row.textContent.toLowerCase();
         const rEstado = row.getAttribute('data-estado');
+        const esAtrasado = row.getAttribute('data-atrasado') === '1';
         
-        const matchesQuery = text.includes(filtroQuery);
-        const matchesEstado = (filtroEstado === 'todos' || rEstado === filtroEstado || (filtroEstado === 'en_ruta' && rEstado === 'en proceso'));
+        const matchesQuery  = text.includes(filtroQuery);
+        let   matchesEstado = false;
+
+        if (filtroEstado === 'todos') {
+            matchesEstado = true;
+        } else if (filtroEstado === 'atrasado') {
+            // Solo mostrar filas marcadas como atrasadas
+            matchesEstado = esAtrasado;
+        } else {
+            matchesEstado = (rEstado === filtroEstado || (filtroEstado === 'en_ruta' && rEstado === 'en proceso'));
+        }
         
         if (matchesQuery && matchesEstado) {
             matchingRows.push(row);
@@ -807,20 +1379,143 @@ function filtrarTabla() {
 function filtrarEstado(estado, btn) {
     const buttons = document.querySelectorAll('.background-shadow button');
     buttons.forEach(b => {
-        b.className = 'div-wrapper';
+        // Preservar la clase btn-atrasados al resetear
+        const esAtrasadosBtn = b.classList.contains('btn-atrasados');
+        b.className = esAtrasadosBtn ? 'div-wrapper btn-atrasados' : 'div-wrapper';
         if (b.querySelector('div')) {
             b.querySelector('div').className = 'text-2';
         }
     });
 
-    btn.className = 'button';
+    const esAtrasadoActivo = btn.classList.contains('btn-atrasados');
+    btn.className = esAtrasadoActivo ? 'button btn-atrasados' : 'button';
     if (btn.querySelector('div')) {
         btn.querySelector('div').className = 'text';
+    }
+
+    // Mostrar/ocultar panel exclusivo de atrasados
+    const panelAtrasados = document.getElementById('panel-asignar-atrasados');
+    if (panelAtrasados) {
+        panelAtrasados.style.display = estado === 'atrasado' ? 'flex' : 'none';
+        // Resetear feedback al cambiar de filtro
+        const fb = document.getElementById('panel-atrasados-feedback');
+        if (fb) fb.style.display = 'none';
+        // Resetear select
+        const repSel = document.getElementById('rep-masivo-atrasados');
+        if (repSel) repSel.value = '';
     }
 
     filtroEstado = estado;
     paginaActual = 1;
     actualizarVista();
+}
+
+/** Asigna el repartidor seleccionado a todos los pedidos atrasados visibles,
+ *  cambia su estado a En Ruta y elimina la advertencia de atrasado */
+function asignarRepartidorAtrasados() {
+    const selectEl = document.getElementById('rep-masivo-atrasados');
+    const repId    = selectEl ? selectEl.value : '';
+    const feedback = document.getElementById('panel-atrasados-feedback');
+
+    if (!repId) {
+        feedback.textContent = '⚠ Selecciona un repartidor primero.';
+        feedback.style.cssText = 'display:block; background:#fff4f2; color:#b02500; border-color:rgba(176,37,0,0.2);';
+        return;
+    }
+
+    const atrasadoRows = Array.from(document.querySelectorAll('#tablaCuerpo .row-pedido[data-atrasado="1"]'));
+    if (atrasadoRows.length === 0) {
+        feedback.textContent = 'No hay pedidos atrasados visibles para asignar.';
+        feedback.style.cssText = 'display:block; background:#fff7ef; color:#7a4500; border-color:rgba(213,164,112,0.2);';
+        return;
+    }
+
+    const repNombre = selectEl.options[selectEl.selectedIndex].text;
+    feedback.textContent = `Asignando ${repNombre} a ${atrasadoRows.length} pedido(s)...`;
+    feedback.style.cssText = 'display:block; background:#f0f8ff; color:#1786ba; border-color:rgba(23,134,186,0.2);';
+
+    const promises = [];
+    atrasadoRows.forEach(row => {
+        const repSelect = row.querySelector('.rep-select');
+        if (!repSelect) return;
+        const pedidoId = repSelect.id.replace('rep-select-', '');
+
+        repSelect.classList.remove('saved', 'error-save');
+        repSelect.classList.add('saving');
+        repSelect.disabled = true;
+
+        const body = new FormData();
+        body.append('accion', 'asignar_repartidor');
+        body.append('id', pedidoId);
+        body.append('repartidor_id', repId);
+        body.append('estado', 'en_ruta'); // Cambiar automáticamente a En Ruta
+
+        promises.push(
+            fetch('forms/logistica_acciones.php', { method: 'POST', body })
+                .then(r => r.json())
+                .then(res => {
+                    repSelect.classList.remove('saving');
+                    repSelect.disabled = false;
+
+                    if (res.status === 'success') {
+                        repSelect.value = repId;
+                        repSelect.classList.add('saved');
+                        setTimeout(() => repSelect.classList.remove('saved'), 2500);
+
+                        // ── Actualizar DOM de la fila inmediatamente ───────────────
+                        // 1. Quitar estilos y atributos de atrasado
+                        row.classList.remove('row-atrasado');
+                        row.removeAttribute('data-atrasado');
+                        row.removeAttribute('data-antiguo');
+
+                        // 2. Ocultar badge ⚠ ATRASADO
+                        const badge = row.querySelector('.badge-atrasado');
+                        if (badge) badge.style.display = 'none';
+
+                        // 3. Actualizar data-estado a en_ruta
+                        row.setAttribute('data-estado', 'en_ruta');
+
+                        // 4. Reemplazar badge de estado visual por "En Ruta"
+                        const statusContainer = row.children[4];
+                        if (statusContainer) {
+                            statusContainer.innerHTML = `
+                                <div class="overlay-7">
+                                  <div class="background-5"></div>
+                                  <div class="text-15" style="color:inherit;">En Ruta</div>
+                                </div>`;
+                        }
+
+                        // 5. Ajustar contadores superiores: pendiente -1, en_ruta +1
+                        const elPend = document.getElementById('contador-pendientes');
+                        const elRuta = document.getElementById('contador-en-ruta');
+                        if (elPend) elPend.textContent = Math.max(0, parseInt(elPend.textContent || 0) - 1);
+                        if (elRuta) elRuta.textContent = parseInt(elRuta.textContent || 0) + 1;
+
+                    } else {
+                        repSelect.classList.add('error-save');
+                        setTimeout(() => repSelect.classList.remove('error-save'), 3000);
+                    }
+                })
+                .catch(() => {
+                    repSelect.classList.remove('saving');
+                    repSelect.disabled = false;
+                    repSelect.classList.add('error-save');
+                    setTimeout(() => repSelect.classList.remove('error-save'), 3000);
+                })
+        );
+    });
+
+    Promise.all(promises)
+        .then(() => {
+            feedback.textContent = `✓ ${repNombre} asignado · ${atrasadoRows.length} pedido(s) cambiados a "En Ruta" y advertencias eliminadas.`;
+            feedback.style.cssText = 'display:block; background:#f0fff3; color:#176a21; border-color:rgba(23,106,33,0.2);';
+            // Re-aplicar vista: las filas ya no tienen data-atrasado, desaparecen del filtro "Atrasados"
+            actualizarVista();
+        })
+        .catch(() => {
+            feedback.textContent = '⚠ Ocurrió un error al asignar algunos pedidos.';
+            feedback.style.cssText = 'display:block; background:#fff4f2; color:#b02500; border-color:rgba(176,37,0,0.2);';
+        });
 }
 
 // Inicializar la vista con paginación al cargar el documento

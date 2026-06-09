@@ -107,14 +107,37 @@ if ($lotesCaducados > 0) {
     ];
 }
 
-// C. Entregas Retrasadas (pedidos pendientes creados hace más de 2 días)
-$retrasadosRes = $conn->query("SELECT COUNT(*) FROM pedidos WHERE estado = 'pendiente' AND fecha_pedido < DATE_SUB(NOW(), INTERVAL 2 DAY)");
-$entregasRetrasadas = $retrasadosRes ? $retrasadosRes->fetch_row()[0] : 0;
-if ($entregasRetrasadas > 0) {
+// C. Entregas Retrasadas (pedidos pendientes/preparados creados hace más de 24 horas)
+$retrasadosRes = $conn->query(
+    "SELECT estado, COUNT(*) AS total
+     FROM pedidos
+     WHERE estado IN ('pendiente','preparado')
+       AND fecha_pedido < NOW() - INTERVAL 24 HOUR
+     GROUP BY estado"
+);
+$retrasadosPorEstado = [];
+$totalRetrasados = 0;
+if ($retrasadosRes) {
+    while ($rr = $retrasadosRes->fetch_assoc()) {
+        $retrasadosPorEstado[$rr['estado']] = (int)$rr['total'];
+        $totalRetrasados += (int)$rr['total'];
+    }
+}
+if ($totalRetrasados > 0) {
+    $desglose = [];
+    if (!empty($retrasadosPorEstado['pendiente'])) {
+        $n = $retrasadosPorEstado['pendiente'];
+        $desglose[] = "<strong>$n pendiente" . ($n !== 1 ? 's' : '') . "</strong>";
+    }
+    if (!empty($retrasadosPorEstado['preparado'])) {
+        $n = $retrasadosPorEstado['preparado'];
+        $desglose[] = "<strong>$n preparado" . ($n !== 1 ? 's' : '') . "</strong>";
+    }
+    $desgloseTexto = implode(' y ', $desglose);
     $alertas[] = [
-        "tipo" => "danger",
-        "mensaje" => "Alerta: Tienes <strong>$entregasRetrasadas pedido(s) pendiente(s) retrasado(s)</strong> con más de 48 horas sin despachar.",
-        "url" => "logistica_admin.php"
+        "tipo"    => "danger",
+        "mensaje" => "⚠ Tienes <strong>$totalRetrasados pedido" . ($totalRetrasados !== 1 ? 's' : '') . " atrasado" . ($totalRetrasados !== 1 ? 's' : '') . "</strong> con más de 24 h sin despachar: $desgloseTexto.",
+        "url"     => "logistica_admin.php"
     ];
 }
 

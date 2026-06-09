@@ -23,26 +23,71 @@ $accion = $_POST["accion"] ?? $_GET["accion"] ?? "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($accion === "crear") {
-        $cliente_id = (int)($_POST["cliente_id"] ?? 0);
-        $repartidor_id = isset($_POST["repartidor_id"]) && $_POST["repartidor_id"] !== "" ? (int)$_POST["repartidor_id"] : null;
-        $total = (float)($_POST["total"] ?? 0.0);
+        $isAjax = (isset($_SERVER["HTTP_X_REQUESTED_WITH"]) &&
+                   strtolower($_SERVER["HTTP_X_REQUESTED_WITH"]) === "xmlhttprequest");
+
+        $cliente_id    = (int)($_POST["cliente_id"] ?? 0);
+        $repartidor_id = isset($_POST["repartidor_id"]) && $_POST["repartidor_id"] !== ""
+                         ? (int)$_POST["repartidor_id"] : null;
+        $total  = 0.00; // el total real vendrá de los productos; aquí se crea el pedido base
         $estado = trim($_POST["estado"] ?? "pendiente");
 
-        if ($cliente_id <= 0 || $total < 0) {
+        if ($cliente_id <= 0) {
+            if ($isAjax) {
+                header("Content-Type: application/json");
+                echo json_encode(["status" => "error", "message" => "Selecciona un cliente válido."]);
+                exit;
+            }
             $_SESSION["mensaje_error"] = "Datos inválidos para crear el pedido.";
             header("Location: ../logistica_admin.php");
             exit;
         }
 
-        $sql = "INSERT INTO pedidos (cliente_id, repartidor_id, total, estado) VALUES (?, ?, ?, ?)";
+        $sql  = "INSERT INTO pedidos (cliente_id, repartidor_id, total, estado) VALUES (?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("iids", $cliente_id, $repartidor_id, $total, $estado);
 
         if ($stmt->execute()) {
             $pedido_id = $conn->insert_id;
+
+            // Propagar el repartidor asignado y el estado a todos los pedidos de este cliente (excluyendo los ya cancelados)
+            $updateSql = "UPDATE pedidos SET repartidor_id = ?, estado = ? WHERE cliente_id = ? AND estado != 'cancelado'";
+            $updateStmt = $conn->prepare($updateSql);
+            $updateStmt->bind_param("isi", $repartidor_id, $estado, $cliente_id);
+            $updateStmt->execute();
+            $updateStmt->close();
+
+            registrar_bitacora("Pedido creado", "Logística",
+                "Se registró el pedido #$pedido_id con estado: $estado y repartidor ID: " . ($repartidor_id ?? "ninguno") . ". Se propagó el repartidor a todos los pedidos del cliente ID: $cliente_id.");
+
+            if ($isAjax) {
+                // Obtener datos completos para construir la fila en el frontend
+                $rowRes = $conn->prepare(
+                    "SELECT p.*,
+                            CONCAT(upc.nombre, ' ', upc.apellido) AS nombre_cliente,
+                            upc.direccion AS direccion_cliente,
+                            CONCAT(upr.nombre, ' ', upr.apellido) AS nombre_repartidor
+                     FROM pedidos p
+                     LEFT JOIN usuario_perfil upc ON p.cliente_id  = upc.usuario_id
+                     LEFT JOIN usuario_perfil upr ON p.repartidor_id = upr.usuario_id
+                     WHERE p.id = ?"
+                );
+                $rowRes->bind_param("i", $pedido_id);
+                $rowRes->execute();
+                $pedidoData = $rowRes->get_result()->fetch_assoc();
+
+                header("Content-Type: application/json");
+                echo json_encode(["status" => "success", "pedido" => $pedidoData]);
+                exit;
+            }
+
             $_SESSION["mensaje_exito"] = "Pedido registrado y asignado correctamente.";
-            registrar_bitacora("Pedido creado", "Logística", "Se registró el pedido #$pedido_id por un total de $$total con estado: $estado.");
         } else {
+            if ($isAjax) {
+                header("Content-Type: application/json");
+                echo json_encode(["status" => "error", "message" => "Error al crear: " . $conn->error]);
+                exit;
+            }
             $_SESSION["mensaje_error"] = "Error al crear el pedido: " . $conn->error;
         }
         header("Location: ../logistica_admin.php");
@@ -138,23 +183,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         header("Location: ../logistica_admin.php");
         exit;
     } elseif ($accion === "asignar_repartidor") {
-        // AJAX quick-assign: solo actualiza el campo repartidor_id del pedido
+        // AJAX quick-assign: actualiza repartidor_id y opcionalmente el estado del pedido
         header("Content-Type: application/json");
         $id            = (int)($_POST["id"] ?? 0);
         $repartidor_id = isset($_POST["repartidor_id"]) && $_POST["repartidor_id"] !== ""
                          ? (int)$_POST["repartidor_id"] : null;
+        $nuevo_estado  = trim($_POST["estado"] ?? "");
+        $estados_validos = ['pendiente','preparado','en_ruta','entregado','cancelado'];
 
         if ($id <= 0) {
             echo json_encode(["status" => "error", "message" => "ID de pedido inválido."]);
             exit;
         }
 
-        $sql  = "UPDATE pedidos SET repartidor_id = ? WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ii", $repartidor_id, $id);
+        // Si viene un estado válido, actualizar también el estado
+        if ($nuevo_estado && in_array($nuevo_estado, $estados_validos)) {
+            $sql  = "UPDATE pedidos SET repartidor_id = ?, estado = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("isi", $repartidor_id, $nuevo_estado, $id);
+        } else {
+            $sql  = "UPDATE pedidos SET repartidor_id = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $repartidor_id, $id);
+        }
 
         if ($stmt->execute()) {
-            // Obtener nombre del repartidor para devolver al frontend
             $nombre_rep = "No asignado";
             if ($repartidor_id) {
                 $res = $conn->prepare("SELECT CONCAT(nombre, ' ', apellido) AS nombre FROM usuario_perfil WHERE usuario_id = ?");
@@ -163,9 +216,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $row = $res->get_result()->fetch_assoc();
                 if ($row) $nombre_rep = $row["nombre"];
             }
-            registrar_bitacora("Repartidor asignado", "Logística",
-                "Se asignó el repartidor '$nombre_rep' (ID: " . ($repartidor_id ?? 'ninguno') . ") al pedido #$id.");
-            echo json_encode(["status" => "success", "message" => "Repartidor actualizado."]);
+            $bitMsg = "Se asignó el repartidor '$nombre_rep' (ID: " . ($repartidor_id ?? 'ninguno') . ") al pedido #$id.";
+            if ($nuevo_estado && in_array($nuevo_estado, $estados_validos)) {
+                $bitMsg .= " Estado actualizado a: $nuevo_estado.";
+            }
+            registrar_bitacora("Repartidor asignado", "Logística", $bitMsg);
+            echo json_encode(["status" => "success", "message" => "Pedido actualizado.", "nuevo_estado" => $nuevo_estado ?: null]);
         } else {
             echo json_encode(["status" => "error", "message" => "Error al actualizar: " . $conn->error]);
         }
@@ -193,6 +249,62 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && $accion === "obtener") {
     } else {
         echo json_encode(["status" => "error", "message" => "Pedido no encontrado"]);
     }
+    exit;
+}
+
+// Endpoint: conteo de pedidos activos por repartidor
+if ($_SERVER["REQUEST_METHOD"] === "GET" && $accion === "pedidos_repartidor") {
+    header("Content-Type: application/json");
+    $rep_id = (int)($_GET["rep_id"] ?? 0);
+    if ($rep_id <= 0) {
+        echo json_encode(["status" => "error", "count" => 0]);
+        exit;
+    }
+    $res  = $conn->prepare("SELECT COUNT(*) FROM pedidos WHERE repartidor_id = ? AND estado IN ('pendiente','preparado','en_ruta')");
+    $res->bind_param("i", $rep_id);
+    $res->execute();
+    $count = (int)$res->get_result()->fetch_row()[0];
+    echo json_encode(["status" => "success", "count" => $count]);
+    exit;
+}
+
+// Endpoint: listado de pedidos PENDIENTES por cliente (atrasados primero)
+if ($_SERVER["REQUEST_METHOD"] === "GET" && $accion === "pedidos_cliente") {
+    header("Content-Type: application/json");
+    $cliente_id = (int)($_GET["cliente_id"] ?? 0);
+    if ($cliente_id <= 0) {
+        echo json_encode(["status" => "error", "count" => 0, "pedidos" => []]);
+        exit;
+    }
+    
+    // Solo pedidos pendientes; los atrasados (>24h) tienen mayor prioridad
+    $stmt = $conn->prepare(
+        "SELECT id, fecha_pedido, total, estado,
+                CASE WHEN fecha_pedido < NOW() - INTERVAL 24 HOUR THEN 1 ELSE 0 END AS es_atrasado
+         FROM pedidos
+         WHERE cliente_id = ? AND estado = 'pendiente'
+         ORDER BY es_atrasado DESC, id DESC"
+    );
+    $stmt->bind_param("i", $cliente_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $pedidos = [];
+    while ($row = $result->fetch_assoc()) {
+        $pedidos[] = [
+            "id"          => $row["id"],
+            "fecha_pedido"=> $row["fecha_pedido"],
+            "total"       => (float)$row["total"],
+            "estado"      => $row["estado"],
+            "es_atrasado" => (bool)$row["es_atrasado"]
+        ];
+    }
+    
+    echo json_encode([
+        "status"  => "success",
+        "count"   => count($pedidos),
+        "pedidos" => $pedidos
+    ]);
     exit;
 }
 

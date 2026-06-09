@@ -803,7 +803,61 @@ while ($row = $resHist->fetch_assoc()) {
       border: 1px solid rgba(213, 164, 112, 0.4) !important;
       box-shadow: 0 24px 60px rgba(50, 37, 20, 0.25) !important;
     }
-  </style>
+    /* ── Paginación de paradas ── */
+  .stops-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .stops-pagination .pag-info {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-medium);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .stops-pagination .pag-btns {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .stops-pagination .pag-btn {
+    height: 36px;
+    min-width: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--glass-border);
+    background: white;
+    color: var(--text-dark);
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stops-pagination .pag-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 6px 14px rgba(255,138,0,.2);
+  }
+  .stops-pagination .pag-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 6px 14px rgba(255,138,0,.2);
+  }
+  .stops-pagination .pag-btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+  }
+</style>
 </head>
 <body>
 
@@ -897,8 +951,8 @@ while ($row = $resHist->fetch_assoc()) {
       <?php if (!empty($paradasActivas)): ?>
       <!-- Interactive Distribution Routing Map -->
       <div class="routing-map-card">
-        <h3>Ruta de Distribución Estática – <?php echo count($paradasActivas); ?> Pedidos por Entregar</h3>
-        <p>Secuencia fija y segura trazada para la entrega rápida de <?php echo count($paradasActivas); ?> pedidos orgánicos actualmente en tu hoja de ruta.</p>
+        <h3>Ruta de Distribución Interactiva – <?php echo count($paradasActivas); ?> Pedidos por Entregar</h3>
+        <p>Mapa interactivo con las paradas asignadas. Arrastra, haz zoom y toca los marcadores para ver el detalle de cada pedido.</p>
         
         <div id="leaflet-map" style="width: 100%; height: 350px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium); z-index: 1;"></div>
         
@@ -909,16 +963,14 @@ while ($row = $resHist->fetch_assoc()) {
         </div>
       </div>
       <?php endif; ?>
-
-      <!-- Paradas list -->
-      <div class="stops-container">
+      <div class="stops-container" id="stops-container">
         <?php if (!empty($paradasActivas)): ?>
           <?php 
           $idx = 1;
           foreach ($paradasActivas as $parada): 
             $est = strtolower($parada["estado"]);
           ?>
-            <article class="stop-card <?php echo $est; ?>" id="stop-card-<?php echo $parada['id']; ?>">
+            <article class="stop-card <?php echo $est; ?>" id="stop-card-<?php echo $parada['id']; ?>" data-stop-index="<?php echo $idx - 1; ?>">
               <div class="stop-number">#<?php echo $idx++; ?></div>
               
               <div class="stop-details">
@@ -939,17 +991,17 @@ while ($row = $resHist->fetch_assoc()) {
               <div>
                 <?php if ($est === "pendiente" || $est === "preparado"): ?>
                   <button class="action-btn" onclick="updateDeliveryStatus(<?php echo $parada['id']; ?>, 'en_ruta')">
-                    Iniciar Ruta ➜
+                    Iniciar Ruta ➤
                   </button>
                 <?php elseif ($est === "en_ruta"): ?>
                   <div class="action-btn-group">
                     <a href="https://www.google.com/maps/dir/?api=1&destination=<?php echo urlencode($parada['pedido_direccion']); ?>" target="_blank" style="text-decoration:none;">
                       <button class="action-btn" style="background:#1786ba; box-shadow: 0 8px 16px rgba(23,134,186,0.2);">
-                        Iniciar Ruta 🧭
+                        Navegar 🧭
                       </button>
                     </a>
-                    <button class="action-btn deliver" onclick="openManageStopModal(<?php echo $parada['id']; ?>, '<?php echo htmlspecialchars($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido']); ?>', '<?php echo htmlspecialchars($parada['pedido_direccion']); ?>')">
-                      Gestionar Parada ✓
+                    <button class="action-btn deliver" onclick="openManageStopModal(<?php echo $parada['id']; ?>, '<?php echo htmlspecialchars($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido']); ?>', '<?php echo htmlspecialchars($parada['pedido_direccion']); ?>');">
+                      Gestionar ✓
                     </button>
                   </div>
                 <?php endif; ?>
@@ -962,6 +1014,15 @@ while ($row = $resHist->fetch_assoc()) {
           </div>
         <?php endif; ?>
       </div>
+
+      <!-- Paginación de paradas (3 por página) -->
+      <?php if (count($paradasActivas) > 3): ?>
+      <div class="stops-pagination" id="stops-pagination">
+        <span class="pag-info" id="stops-pag-info">Parada 1–3 de <?php echo count($paradasActivas); ?></span>
+        <div class="pag-btns" id="stops-pag-btns"></div>
+      </div>
+      <?php endif; ?>
+
     </section>
 
     <!-- PESTAÑA: HISTORIAL -->
@@ -1250,6 +1311,63 @@ while ($row = $resHist->fetch_assoc()) {
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
+  // ── Paginación de Paradas (3 por página) ──
+  const STOPS_POR_PAG = 3;
+  let stopsPaginaActual = 1;
+
+  function renderStopsPagination() {
+      const cards   = document.querySelectorAll('#stops-container .stop-card');
+      const total   = cards.length;
+      if (total === 0) return;
+
+      const totalPags = Math.ceil(total / STOPS_POR_PAG);
+      const inicio    = (stopsPaginaActual - 1) * STOPS_POR_PAG;
+      const fin       = inicio + STOPS_POR_PAG;
+
+      // Mostrar / ocultar tarjetas
+      cards.forEach((card, i) => {
+          card.style.display = (i >= inicio && i < fin) ? '' : 'none';
+      });
+
+      // Texto de info
+      const infoEl = document.getElementById('stops-pag-info');
+      if (infoEl) {
+          const desde = Math.min(inicio + 1, total);
+          const hasta = Math.min(fin, total);
+          infoEl.textContent = `Parada ${desde}–${hasta} de ${total}`;
+      }
+
+      // Render botones
+      const btnsEl = document.getElementById('stops-pag-btns');
+      if (!btnsEl) return;
+      btnsEl.innerHTML = '';
+
+      // Botón Anterior
+      const btnPrev = document.createElement('button');
+      btnPrev.className = 'pag-btn';
+      btnPrev.innerHTML = '← Anterior';
+      btnPrev.disabled  = stopsPaginaActual === 1;
+      btnPrev.onclick   = () => { stopsPaginaActual--; renderStopsPagination(); };
+      btnsEl.appendChild(btnPrev);
+
+      // Botones numéricos
+      for (let p = 1; p <= totalPags; p++) {
+          const btn = document.createElement('button');
+          btn.className = 'pag-btn' + (p === stopsPaginaActual ? ' active' : '');
+          btn.textContent = p;
+          btn.onclick = () => { stopsPaginaActual = p; renderStopsPagination(); };
+          btnsEl.appendChild(btn);
+      }
+
+      // Botón Siguiente
+      const btnNext = document.createElement('button');
+      btnNext.className = 'pag-btn';
+      btnNext.innerHTML = 'Siguiente →';
+      btnNext.disabled  = stopsPaginaActual === totalPags;
+      btnNext.onclick   = () => { stopsPaginaActual++; renderStopsPagination(); };
+      btnsEl.appendChild(btnNext);
+  }
+
   // Tab Switcher
   let leafletMapInstance = null; // Instancia global del mapa
 
@@ -1276,10 +1394,11 @@ while ($row = $resHist->fetch_assoc()) {
           document.getElementById('page-subtitle').textContent = titles[tabName].subtitle;
       }
 
-      // Redibujar el mapa para corregir tamaño en contenedores previamente ocultos
-      if (tabName === 'hoja-ruta' && leafletMapInstance) {
+      // Redibujar el mapa y paginación al cambiar a la pestaña de ruta
+      if (tabName === 'hoja-ruta') {
           setTimeout(() => {
-              leafletMapInstance.invalidateSize();
+              if (leafletMapInstance) leafletMapInstance.invalidateSize();
+              renderStopsPagination();
           }, 200);
       }
   }
@@ -1353,15 +1472,15 @@ while ($row = $resHist->fetch_assoc()) {
                   gpsInput.value = `Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
               },
               (err) => {
-                  // Fallback realista en caso de denegación de permisos o red
-                  const mockLat = (37.3891 + (Math.random() - 0.5) * 0.05).toFixed(4);
-                  const mockLng = (-5.9845 + (Math.random() - 0.5) * 0.05).toFixed(4);
+                  // Fallback realista en caso de denegación de permisos o red (CDMX)
+                  const mockLat = (19.4326 + (Math.random() - 0.5) * 0.05).toFixed(4);
+                  const mockLng = (-99.1332 + (Math.random() - 0.5) * 0.05).toFixed(4);
                   gpsInput.value = `Lat: ${mockLat}, Lng: ${mockLng} (Simulado GPS)`;
               },
               { timeout: 5000 }
           );
       } else {
-          gpsInput.value = "Lat: 37.3891, Lng: -5.9845 (Simulado)";
+          gpsInput.value = "Lat: 19.4326, Lng: -99.1332 (Simulado CDMX)";
       }
   }
 
@@ -1719,20 +1838,23 @@ while ($row = $resHist->fetch_assoc()) {
           });
       }
 
+      // Inicializar paginación de paradas al cargar la página
+      renderStopsPagination();
+
       const mapContainer = document.getElementById('leaflet-map');
       if (mapContainer) {
-          // Coordenadas del Almacén Central de EcoAli (Sevilla, España)
-          const warehouseCoords = [37.3891, -5.9845];
+          // Coordenadas del Almacén Central de EcoAli (Ciudad de México, México)
+          const warehouseCoords = [19.4326, -99.1332];
           
-          // Crear mapa Leaflet estático (sin posibilidad de arrastre, zoom o interacción)
+          // Crear mapa Leaflet INTERACTIVO
           leafletMapInstance = L.map('leaflet-map', {
-              dragging: false,
-              zoomControl: false,
-              scrollWheelZoom: false,
-              doubleClickZoom: false,
-              touchZoom: false,
-              boxZoom: false,
-              keyboard: false
+              dragging:        true,
+              zoomControl:     true,
+              scrollWheelZoom: true,
+              doubleClickZoom: true,
+              touchZoom:       true,
+              boxZoom:         true,
+              keyboard:        true
           }).setView(warehouseCoords, 13);
 
           // Usar capa CartoDB Dark Matter para coincidir con la estética oscura premium del panel
@@ -1761,8 +1883,8 @@ while ($row = $resHist->fetch_assoc()) {
           activeStops.forEach((stop, idx) => {
               // Generar coordenadas deterministas basadas en el ID de parada para distribuirlas en Sevilla
               const seed = parseInt(stop.id) || 1;
-              const latOffset = Math.sin(seed * 123.456) * 0.012;
-              const lngOffset = Math.cos(seed * 456.789) * 0.012;
+              const latOffset = Math.sin(seed * 123.456) * 0.018;
+              const lngOffset = Math.cos(seed * 456.789) * 0.018;
               const stopCoords = [warehouseCoords[0] + latOffset, warehouseCoords[1] + lngOffset];
               
               routePoints.push(stopCoords);
