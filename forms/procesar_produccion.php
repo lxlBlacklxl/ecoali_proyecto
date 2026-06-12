@@ -90,27 +90,27 @@ try {
 
     $prod_nombre = $resProd->fetch_assoc()["nombre"];
 
-    // 3. Registrar en la tabla `produccion`
-    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, fecha_produccion, observaciones, granja_id) VALUES (?, ?, ?, ?, ?, ?)";
-    $stmtInsertProd = $conn->prepare($sqlInsertProd);
-    $stmtInsertProd->bind_param("iiissi", $proveedor_id, $producto_id, $cantidad, $fecha_produccion, $observaciones, $granja_id);
-    
-    if (!$stmtInsertProd->execute()) {
-        throw new Exception("Error al registrar la producción: " . $conn->error);
-    }
-
-    // 4. Generar código de lote único (ej: LOTE-P1-U3-A42F)
+    // 3. Generar código de lote único (ej: LOTE-P1-U3-A42F)
     $lote_id_hash = strtoupper(substr(md5(time() . rand(1, 100)), 0, 4));
     $codigo_lote = "LOTE-P" . $producto_id . "-U" . $usuario_id . "-" . $lote_id_hash;
 
     // Calcular fecha de caducidad (30 días después de la postura/producción)
     $fecha_caducidad = date('Y-m-d', strtotime('+30 days', strtotime($fecha_produccion)));
 
+    // 4. Registrar en la tabla `produccion`
+    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, fecha_produccion, observaciones, granja_id, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    $stmtInsertProd = $conn->prepare($sqlInsertProd);
+    $stmtInsertProd->bind_param("iiissss", $proveedor_id, $producto_id, $cantidad, $fecha_produccion, $observaciones, $granja_id, $codigo_lote);
+    
+    if (!$stmtInsertProd->execute()) {
+        throw new Exception("Error al registrar la producción: " . $conn->error);
+    }
+
     // 5. Crear lote en `inventario_huevos`
-    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad, fecha_postura, fecha_caducidad, estado, granja_id)
-                     VALUES (?, ?, ?, ?, ?, ?, 'disponible', ?)";
+    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, fecha_postura, fecha_caducidad, estado, granja_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?)";
     $stmtInsertInv = $conn->prepare($sqlInsertInv);
-    $stmtInsertInv->bind_param("iisissi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id);
+    $stmtInsertInv->bind_param("iisiisssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id);
 
     if (!$stmtInsertInv->execute()) {
         throw new Exception("Error al ingresar el lote al inventario: " . $conn->error);
