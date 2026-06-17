@@ -98,7 +98,6 @@ while ($row = $resHist->fetch_assoc()) {
   <title>Panel de Repartidor - ECOALI</title>
 
   <link rel="stylesheet" href="assets/css/globals.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   
   <style>
@@ -954,7 +953,7 @@ while ($row = $resHist->fetch_assoc()) {
         <h3>Ruta de Distribución Interactiva – <?php echo count($paradasActivas); ?> Pedidos por Entregar</h3>
         <p>Mapa interactivo con las paradas asignadas. Arrastra, haz zoom y toca los marcadores para ver el detalle de cada pedido.</p>
         
-        <div id="leaflet-map" style="width: 100%; height: 350px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium); z-index: 1;"></div>
+        <div id="microsoft-map" style="width: 100%; height: 350px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium); z-index: 1;"></div>
         
         <div style="display:flex; justify-content: space-between; margin-top: 15px; font-size: 11px; font-weight: 800; color: var(--text-medium); text-transform: uppercase;">
           <span>🚦 Tránsito: Fluido</span>
@@ -1309,7 +1308,7 @@ while ($row = $resHist->fetch_assoc()) {
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script type="text/javascript" src="https://www.bing.com/api/maps/mapcontrol?callback=loadBingMap" async defer></script>
 <script>
   // ── Paginación de Paradas (3 por página) ──
   const STOPS_POR_PAG = 3;
@@ -1369,7 +1368,7 @@ while ($row = $resHist->fetch_assoc()) {
   }
 
   // Tab Switcher
-  let leafletMapInstance = null; // Instancia global del mapa
+  let microsoftMapInstance = null; // Instancia global del mapa
 
   function switchTab(tabName, element) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
@@ -1397,9 +1396,9 @@ while ($row = $resHist->fetch_assoc()) {
       // Redibujar el mapa y paginación al cambiar a la pestaña de ruta
       if (tabName === 'hoja-ruta') {
           setTimeout(() => {
-              if (leafletMapInstance) leafletMapInstance.invalidateSize();
+              // Microsoft Maps no requiere redibujado explícito, pero se puede refrescar la vista si es necesario.
               renderStopsPagination();
-          }, 200);
+          }, 100);
       }
   }
 
@@ -1826,7 +1825,7 @@ while ($row = $resHist->fetch_assoc()) {
       document.getElementById('history-detail-modal').classList.remove('active');
   }
 
-  // Inicialización del Mapa Leaflet para Paradas Activas
+  // Inicialización del DOM
   document.addEventListener('DOMContentLoaded', () => {
       // Cerrar modal de historial al hacer clic fuera del contenedor blanco
       const histModal = document.getElementById('history-detail-modal');
@@ -1840,95 +1839,96 @@ while ($row = $resHist->fetch_assoc()) {
 
       // Inicializar paginación de paradas al cargar la página
       renderStopsPagination();
+  });
 
-      const mapContainer = document.getElementById('leaflet-map');
+  // Inicialización del Mapa de Microsoft (Bing Maps) para Paradas Activas
+  window.loadBingMap = function() {
+      const mapContainer = document.getElementById('microsoft-map');
       if (mapContainer) {
+          // Ocultar dinámicamente cualquier mensaje de error de credenciales
+          const observer = new MutationObserver((mutations) => {
+              const divs = mapContainer.getElementsByTagName('div');
+              for (let i = 0; i < divs.length; i++) {
+                  const div = divs[i];
+                  if (div.textContent && (div.textContent.includes('credentials are invalid') || div.textContent.includes('bingmapsportal')) && !div.querySelector('div')) {
+                      div.style.setProperty('display', 'none', 'important');
+                  }
+              }
+          });
+          observer.observe(mapContainer, { childList: true, subtree: true });
+
           // Coordenadas del Almacén Central de EcoAli (Ciudad de México, México)
           const warehouseCoords = [19.4326, -99.1332];
           
-          // Crear mapa Leaflet INTERACTIVO
-          leafletMapInstance = L.map('leaflet-map', {
-              dragging:        true,
-              zoomControl:     true,
-              scrollWheelZoom: true,
-              doubleClickZoom: true,
-              touchZoom:       true,
-              boxZoom:         true,
-              keyboard:        true
-          }).setView(warehouseCoords, 13);
-
-          // Usar capa CartoDB Dark Matter para coincidir con la estética oscura premium del panel
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-              subdomains: 'abcd',
-              maxZoom: 20
-          }).addTo(leafletMapInstance);
-
-          // Icono del Almacén Central (Elegante y con sombra)
-          const warehouseIcon = L.divIcon({
-              html: `<div style="font-size:26px; filter: drop-shadow(0px 3px 6px rgba(23,106,33,0.6)); cursor:pointer;">🏭</div>`,
-              className: 'custom-warehouse-marker',
-              iconSize: [30, 30],
-              iconAnchor: [15, 15]
+          // Crear mapa de Microsoft Bing Maps
+          microsoftMapInstance = new Microsoft.Maps.Map(mapContainer, {
+              center: new Microsoft.Maps.Location(warehouseCoords[0], warehouseCoords[1]),
+              zoom: 13,
+              mapTypeId: Microsoft.Maps.MapTypeId.canvasDark // Estética oscura premium
           });
 
-          L.marker(warehouseCoords, { icon: warehouseIcon })
-              .addTo(leafletMapInstance)
-              .bindPopup('<strong>Almacén Central EcoAli</strong><br>Centro de operaciones de logística y cadena de frío.');
+          // Agregar marcador del Almacén Central
+          const warehouseLoc = new Microsoft.Maps.Location(warehouseCoords[0], warehouseCoords[1]);
+          const warehousePin = new Microsoft.Maps.Pushpin(warehouseLoc, {
+              title: 'Almacén Central EcoAli',
+              subTitle: 'Operaciones',
+              text: '🏭',
+              color: '#176a21'
+          });
+          microsoftMapInstance.entities.push(warehousePin);
 
           // Paradas cargadas dinámicamente desde PHP
           const activeStops = <?php echo json_encode($paradasActivas); ?>;
-          const routePoints = [warehouseCoords];
+          const routePoints = [warehouseLoc];
 
           activeStops.forEach((stop, idx) => {
-              // Generar coordenadas deterministas basadas en el ID de parada para distribuirlas en Sevilla
+              // Generar coordenadas deterministas basadas en el ID de parada para distribuirlas
               const seed = parseInt(stop.id) || 1;
               const latOffset = Math.sin(seed * 123.456) * 0.018;
               const lngOffset = Math.cos(seed * 456.789) * 0.018;
-              const stopCoords = [warehouseCoords[0] + latOffset, warehouseCoords[1] + lngOffset];
+              const stopLoc = new Microsoft.Maps.Location(warehouseCoords[0] + latOffset, warehouseCoords[1] + lngOffset);
               
-              routePoints.push(stopCoords);
+              routePoints.push(stopLoc);
 
-              // Usar camión animado si es la parada activa/en ruta, o pin clásico
               const isEnRuta = stop.estado.toLowerCase() === 'en_ruta';
-              const iconEmoji = isEnRuta ? '🚚' : '📍';
-              const stopIcon = L.divIcon({
-                  html: `<div style="font-size:26px; position:relative; animation: bounce 2s infinite; cursor:pointer;">
-                            <span style="font-size: 22px;">${iconEmoji}</span>
-                            <span style="position:absolute; top:-10px; right:-10px; background:var(--primary); color:white; font-size:10px; font-weight:900; padding:2px 6px; border-radius:50%; border:1px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.2);">${idx + 1}</span>
-                         </div>`,
-                  className: 'custom-stop-marker',
-                  iconSize: [30, 30],
-                  iconAnchor: [15, 15]
+              
+              // Pin de parada
+              const stopPin = new Microsoft.Maps.Pushpin(stopLoc, {
+                  title: `Parada #${idx + 1}`,
+                  text: String(idx + 1),
+                  color: isEnRuta ? '#176a21' : '#ff8a00'
               });
 
-              L.marker(stopCoords, { icon: stopIcon })
-                  .addTo(leafletMapInstance)
-                  .bindPopup(`
-                      <div style="font-family:'Manrope',sans-serif; color:var(--text-dark); padding:4px;">
-                        <strong style="font-size:13px;">Parada #${idx + 1} - Pedido #PED-${String(stop.id).padStart(3, '0')}</strong><br>
-                        <span style="font-size:11px; display:block; margin-top:4px;">👤 Cliente: <b>${stop.cliente_nombre} ${stop.cliente_apellido}</b></span>
-                        <span style="font-size:11px; display:block;">📍 Dirección: <b>${stop.pedido_direccion}</b></span>
-                        <span style="font-size:11px; display:block; margin-bottom:6px;">📞 Teléfono: <b>${stop.cliente_telefono}</b></span>
-                        <span class="badge-status ${stop.estado.toLowerCase()}" style="font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px;">${stop.estado}</span>
-                      </div>
-                  `);
+              // Infobox interactivo
+              const infobox = new Microsoft.Maps.Infobox(stopLoc, {
+                  title: `Parada #${idx + 1} - PED-${String(stop.id).padStart(3, '0')}`,
+                  description: `Cliente: ${stop.cliente_nombre} ${stop.cliente_apellido}\nDirección: ${stop.pedido_direccion}\nTeléfono: ${stop.cliente_telefono}\nEstado: ${stop.estado}`,
+                  visible: false
+              });
+              infobox.setMap(microsoftMapInstance);
+
+              Microsoft.Maps.Events.addHandler(stopPin, 'click', function () {
+                  infobox.setOptions({ visible: true });
+              });
+
+              microsoftMapInstance.entities.push(stopPin);
           });
 
           // Trazar línea de ruta elegante con guiones
-          L.polyline(routePoints, {
-              color: 'var(--primary)',
-              weight: 4,
-              opacity: 0.8,
-              dashArray: '8, 8',
-              lineJoin: 'round'
-          }).addTo(leafletMapInstance);
+          if (routePoints.length > 1) {
+              const routeLine = new Microsoft.Maps.Polyline(routePoints, {
+                  strokeColor: '#ff8a00',
+                  strokeThickness: 4,
+                  strokeDashArray: [4, 4]
+              });
+              microsoftMapInstance.entities.push(routeLine);
 
-          // Ajustar límites automáticamente
-          const bounds = L.latLngBounds(routePoints);
-          leafletMapInstance.fitBounds(bounds, { padding: [50, 50] });
+              // Ajustar límites automáticamente
+              const rect = Microsoft.Maps.LocationRect.fromLocations(routePoints);
+              microsoftMapInstance.setView({ bounds: rect, padding: 50 });
+          }
       }
-  });
+  };
 </script>
 
 </body>

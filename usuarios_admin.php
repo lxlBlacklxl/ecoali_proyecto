@@ -340,15 +340,23 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Dirección (Ubicación/Granja)</label>
-        <input type="text" name="direccion" class="form-input" placeholder="Ej. Av. de las Flores 34, Madrid">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; display: none;" id="crear-grupo-direccion-zona">
+        <div class="form-group">
+          <label class="form-label">Zona de Trabajo (Ruta CDMX) *</label>
+          <select name="direccion" id="crear_direccion_zona" class="form-select" disabled>
+            <option value="Norte de la CDMX">Norte de la CDMX</option>
+            <option value="Sur de la CDMX">Sur de la CDMX</option>
+            <option value="Este de la CDMX">Este de la CDMX</option>
+            <option value="Oeste de la CDMX">Oeste de la CDMX</option>
+          </select>
+        </div>
+        <div></div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
         <div class="form-group">
           <label class="form-label">Rol del Sistema</label>
-          <select name="rol_id" class="form-select">
+          <select name="rol_id" id="crear_rol_id" class="form-select">
             <option value="1">Administrador</option>
             <option value="2" selected>Cliente</option>
             <option value="3">Proveedor</option>
@@ -416,9 +424,17 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Dirección (Ubicación/Granja)</label>
-        <input type="text" name="direccion" id="edit_direccion" class="form-input">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; display: none;" id="edit-grupo-direccion-zona">
+        <div class="form-group">
+          <label class="form-label">Zona de Trabajo (Ruta CDMX) *</label>
+          <select name="direccion" id="edit_direccion_zona" class="form-select" disabled>
+            <option value="Norte de la CDMX">Norte de la CDMX</option>
+            <option value="Sur de la CDMX">Sur de la CDMX</option>
+            <option value="Este de la CDMX">Este de la CDMX</option>
+            <option value="Oeste de la CDMX">Oeste de la CDMX</option>
+          </select>
+        </div>
+        <div></div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -488,8 +504,27 @@ function abrirModalEditar(id) {
                 document.getElementById('edit_apellido').value = res.data.apellido || '';
                 document.getElementById('edit_email').value = res.data.email || '';
                 document.getElementById('edit_telefono').value = res.data.telefono || '';
-                document.getElementById('edit_direccion').value = res.data.direccion || '';
+                
+                // Si es repartidor, seleccionar la zona correspondiente en el dropdown
+                if (String(res.data.rol_id) === '4') {
+                    const dirVal = res.data.direccion || '';
+                    const editZoneInput = document.getElementById('edit_direccion_zona');
+                    if (dirVal.toLowerCase().includes('norte')) {
+                        editZoneInput.value = 'Norte de la CDMX';
+                    } else if (dirVal.toLowerCase().includes('sur')) {
+                        editZoneInput.value = 'Sur de la CDMX';
+                    } else if (dirVal.toLowerCase().includes('este')) {
+                        editZoneInput.value = 'Este de la CDMX';
+                    } else if (dirVal.toLowerCase().includes('oeste')) {
+                        editZoneInput.value = 'Oeste de la CDMX';
+                    }
+                }
+                
                 document.getElementById('edit_rol_id').value = res.data.rol_id;
+                // Forzar la actualización del toggler después de cargar la data
+                const event = new Event('change');
+                document.getElementById('edit_rol_id').dispatchEvent(event);
+                
                 document.getElementById('edit_activo').value = res.data.activo;
                 
                 document.getElementById('modalEditar').classList.add('active');
@@ -625,11 +660,39 @@ function filtrarRol(rol, btn) {
     actualizarVistaUsuarios();
 }
 
+// Función para alternar la visualización del desplegable de Zona según el rol (solo Repartidor)
+function configurarAlternanciaDireccion(rolSelectId, zoneGrpId, zoneInputId) {
+    const rolSelect = document.getElementById(rolSelectId);
+    const zoneGrp = document.getElementById(zoneGrpId);
+    const zoneInput = document.getElementById(zoneInputId);
+
+    if (!rolSelect) return;
+
+    function actualizar() {
+        if (rolSelect.value === '4') { // 4 = Repartidor
+            zoneGrp.style.display = 'grid';
+            zoneInput.disabled = false;
+        } else {
+            zoneGrp.style.display = 'none';
+            zoneInput.disabled = true;
+        }
+    }
+
+    rolSelect.addEventListener('change', actualizar);
+    actualizar(); // Ejecutar al inicio
+}
+
 // Inicializar la vista con paginación al cargar el documento
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", actualizarVistaUsuarios);
+    document.addEventListener("DOMContentLoaded", () => {
+        actualizarVistaUsuarios();
+        configurarAlternanciaDireccion('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona');
+        configurarAlternanciaDireccion('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona');
+    });
 } else {
     actualizarVistaUsuarios();
+    configurarAlternanciaDireccion('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona');
+    configurarAlternanciaDireccion('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona');
 }
 </script>
 </body>

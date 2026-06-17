@@ -2,6 +2,43 @@
 session_start();
 require "conexion.php";
 
+function check_ruta_match($conn, $pedido_id, $repartidor_id) {
+    if (!$repartidor_id) return true; // Permitir desasignar
+
+    // Obtener dirección del cliente del pedido
+    $stmt = $conn->prepare("SELECT up.direccion FROM pedidos p INNER JOIN usuario_perfil up ON p.cliente_id = up.usuario_id WHERE p.id = ?");
+    $stmt->bind_param("i", $pedido_id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$res) return true;
+    $dir_cliente = strtolower($res['direccion']);
+
+    // Obtener dirección/ruta del repartidor
+    $stmtRep = $conn->prepare("SELECT direccion FROM usuario_perfil WHERE usuario_id = ?");
+    $stmtRep->bind_param("i", $repartidor_id);
+    $stmtRep->execute();
+    $resRep = $stmtRep->get_result()->fetch_assoc();
+    $stmtRep->close();
+    if (!$resRep) return true;
+    $dir_rep = strtolower($resRep['direccion']);
+
+    $puntos = ['norte', 'sur', 'este', 'oeste'];
+    
+    // Si la dirección del cliente tiene alguno de los puntos cardinales, el repartidor debe tener el mismo punto cardinal
+    foreach ($puntos as $punto) {
+        $in_cliente = (strpos($dir_cliente, $punto) !== false);
+        $in_rep = (strpos($dir_rep, $punto) !== false);
+        
+        if ($in_cliente && !$in_rep) {
+            return false; // No coincide la ruta
+        }
+    }
+    
+    return true;
+}
+
+
 if (!isset($_SESSION["admin_session"])) {
     if (isset($_SESSION["usuario_id"]) && (int)$_SESSION["rol_id"] === 1) {
         $_SESSION["admin_session"] = [
@@ -41,6 +78,44 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION["mensaje_error"] = "Datos inválidos para crear el pedido.";
             header("Location: ../logistica_admin.php");
             exit;
+        }
+
+        if ($repartidor_id !== null) {
+            // Verificar coincidencia de ruta para el nuevo pedido
+            $stmtCli = $conn->prepare("SELECT direccion FROM usuario_perfil WHERE usuario_id = ?");
+            $stmtCli->bind_param("i", $cliente_id);
+            $stmtCli->execute();
+            $resCli = $stmtCli->get_result()->fetch_assoc();
+            $stmtCli->close();
+            $dir_cliente = $resCli ? strtolower($resCli['direccion']) : '';
+
+            $stmtRep = $conn->prepare("SELECT direccion FROM usuario_perfil WHERE usuario_id = ?");
+            $stmtRep->bind_param("i", $repartidor_id);
+            $stmtRep->execute();
+            $resRep = $stmtRep->get_result()->fetch_assoc();
+            $stmtRep->close();
+            $dir_rep = $resRep ? strtolower($resRep['direccion']) : '';
+
+            $puntos = ['norte', 'sur', 'este', 'oeste'];
+            $match_failed = false;
+            foreach ($puntos as $punto) {
+                $in_cliente = (strpos($dir_cliente, $punto) !== false);
+                $in_rep = (strpos($dir_rep, $punto) !== false);
+                if ($in_cliente && !$in_rep) {
+                    $match_failed = true;
+                    break;
+                }
+            }
+            if ($match_failed) {
+                if ($isAjax) {
+                    header("Content-Type: application/json");
+                    echo json_encode(["status" => "error", "message" => "El repartidor no cubre la ruta de este cliente."]);
+                    exit;
+                }
+                $_SESSION["mensaje_error"] = "Error: El repartidor no cubre la ruta de este cliente.";
+                header("Location: ../logistica_admin.php");
+                exit;
+            }
         }
 
         $sql  = "INSERT INTO pedidos (cliente_id, repartidor_id, total, estado) VALUES (?, ?, ?, ?)";
@@ -104,6 +179,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION["mensaje_error"] = "Datos inválidos para actualizar el pedido.";
             header("Location: ../logistica_admin.php");
             exit;
+        }
+
+        if ($repartidor_id !== null) {
+            if (!check_ruta_match($conn, $id, $repartidor_id)) {
+                $_SESSION["mensaje_error"] = "Error: El repartidor seleccionado no cubre la ruta de este pedido.";
+                header("Location: ../logistica_admin.php");
+                exit;
+            }
         }
 
         $sql = "UPDATE pedidos SET cliente_id = ?, repartidor_id = ?, total = ?, estado = ? WHERE id = ?";
@@ -194,6 +277,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($id <= 0) {
             echo json_encode(["status" => "error", "message" => "ID de pedido inválido."]);
             exit;
+        }
+
+        if ($repartidor_id !== null) {
+            if (!check_ruta_match($conn, $id, $repartidor_id)) {
+                echo json_encode(["status" => "error", "message" => "El repartidor no cubre la ruta de este pedido."]);
+                exit;
+            }
         }
 
         // Si viene un estado válido, actualizar también el estado
