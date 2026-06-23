@@ -12,7 +12,7 @@
 // 1. CONFIGURACIÓN DE PARÁMETROS DEL SERVIDOR DE BASE DE DATOS
 $host = "127.0.0.1";
 $usuario = "root";
-$password = "Ecoali123!";
+$password = "";
 $bd = "ecoali";
 
 // 2. CREACIÓN DE LA INSTANCIA DE CONEXIÓN CON MYSQLI
@@ -64,6 +64,50 @@ $conn->query("CREATE TABLE IF NOT EXISTS `granjas` (
     FOREIGN KEY (`proveedor_id`) REFERENCES `proveedores`(`id`) ON DELETE CASCADE
 )");
 
+// 8.0.1 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE CEDIS SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `cedis` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `nombre` VARCHAR(150) NOT NULL,
+    `direccion` VARCHAR(255) NOT NULL,
+    `activo` TINYINT NOT NULL DEFAULT 1,
+    `creado_en` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+
+// Sembrar datos de prueba para CEDIS si está vacía
+$resCedisCheck = $conn->query("SELECT COUNT(*) FROM `cedis`");
+if ($resCedisCheck && (int)$resCedisCheck->fetch_row()[0] === 0) {
+    $conn->query("INSERT INTO `cedis` (nombre, direccion, activo) VALUES 
+        ('CEDIS Principal', 'Avenida de la Constitución 120, Sevilla', 1),
+        ('CEDIS Norte', 'Polígono Industrial Norte, Calle A, Madrid', 1),
+        ('CEDIS Sur', 'Avenida de Andalucía 54, Málaga', 1)
+    ");
+}
+
+// 8.1 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE ENTREGAS AL CEDIS SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `entregas_cedis` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `proveedor_id` INT NOT NULL,
+    `cedis_id` INT NOT NULL,
+    `repartidor_id` INT DEFAULT NULL,
+    `fecha_solicitud` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `fecha_recoleccion` DATE NOT NULL,
+    `fecha_recepcion` DATETIME DEFAULT NULL,
+    `estado` ENUM('pendiente', 'en_ruta', 'recibido', 'cancelado') NOT NULL DEFAULT 'pendiente',
+    `observaciones` TEXT,
+    `motivo_rechazo` TEXT,
+    FOREIGN KEY (`proveedor_id`) REFERENCES `proveedores`(`id`) ON DELETE CASCADE
+)");
+
+// 8.2 MIGRACIÓN AUTOMÁTICA: CREAR TABLA DE DETALLE DE ENTREGA AL CEDIS SI NO EXISTE
+$conn->query("CREATE TABLE IF NOT EXISTS `detalle_entrega_cedis` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `entrega_id` INT NOT NULL,
+    `lote_id` INT NOT NULL,
+    `cantidad` INT NOT NULL,
+    FOREIGN KEY (`entrega_id`) REFERENCES `entregas_cedis`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`lote_id`) REFERENCES `inventario_huevos`(`id`) ON DELETE CASCADE
+)");
+
 // 9. MIGRACIÓN AUTOMÁTICA: AGREGAR granja_id A produccion E inventario_huevos SI NO EXISTEN
 $resColProd = $conn->query("SHOW COLUMNS FROM `produccion` LIKE 'granja_id'");
 if ($resColProd && $resColProd->num_rows === 0) {
@@ -74,6 +118,33 @@ $resColInv = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'granja_id
 if ($resColInv && $resColInv->num_rows === 0) {
     $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `granja_id` INT NULL, ADD FOREIGN KEY (`granja_id`) REFERENCES `granjas`(`id`) ON DELETE SET NULL");
 }
+
+// 9.1 MIGRACIÓN AUTOMÁTICA: AGREGAR codigo_lote A produccion SI NO EXISTE
+$resColProdLote = $conn->query("SHOW COLUMNS FROM `produccion` LIKE 'codigo_lote'");
+if ($resColProdLote && $resColProdLote->num_rows === 0) {
+    $conn->query("ALTER TABLE `produccion` ADD COLUMN `codigo_lote` VARCHAR(50) NULL");
+    
+    // Intentar asociar lotes existentes de inventario_huevos a produccion
+    $conn->query("UPDATE produccion p 
+                  INNER JOIN inventario_huevos i ON p.proveedor_id = i.proveedor_id 
+                    AND p.producto_id = i.producto_id 
+                    AND p.cantidad = i.cantidad 
+                    AND p.fecha_produccion = i.fecha_postura 
+                    AND (p.granja_id = i.granja_id OR (p.granja_id IS NULL AND i.granja_id IS NULL))
+                  SET p.codigo_lote = i.codigo_lote
+                  WHERE p.codigo_lote IS NULL OR p.codigo_lote = ''");
+}
+
+// 9.1.2 MIGRACIÓN AUTOMÁTICA: AGREGAR cantidad_inicial A inventario_huevos SI NO EXISTE
+$resColInvInit = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'cantidad_inicial'");
+if ($resColInvInit && $resColInvInit->num_rows === 0) {
+    $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `cantidad_inicial` INT NOT NULL DEFAULT 0");
+    // Inicializar cantidad_inicial con el valor de cantidad para los registros existentes
+    $conn->query("UPDATE `inventario_huevos` SET `cantidad_inicial` = `cantidad` WHERE `cantidad_inicial` = 0");
+}
+
+// 9.1.3 MIGRACIÓN AUTOMÁTICA: COMPATIBILIDAD ENUM ESTADO EN inventario_huevos
+$conn->query("ALTER TABLE `inventario_huevos` MODIFY COLUMN `estado` ENUM('disponible','bajo_stock','caducado','vendido','activo','proximo_caducar') DEFAULT 'disponible'");
 
 // 9.2 COMPATIBILIDAD LOGÍSTICA: AGREGAR COLUMNAS DE ENTREGA A PEDIDOS SI NO EXISTEN
 $resFechaEntrega = $conn->query("SHOW COLUMNS FROM `pedidos` LIKE 'fecha_entrega'");

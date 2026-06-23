@@ -626,6 +626,8 @@ if (!empty($pedidos)) {
       padding: 40px 30px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.15);
       border: 1px solid var(--glass-border);
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     /* Tab pane styling */
@@ -884,16 +886,16 @@ if (!empty($pedidos)) {
 
     <nav class="sidebar-menu">
       <button class="menu-btn active" onclick="switchTab('catalogo', this)">
-        <span>▦</span> <span>Catálogo</span>
+        <span>🥚</span> <span>Comprar Huevos</span>
       </button>
       <button class="menu-btn" onclick="switchTab('pedidos', this)">
-        <span>▤</span> <span>Mis Pedidos</span>
+        <span>📦</span> <span>Mis Compras</span>
       </button>
       <button class="menu-btn" onclick="switchTab('regalias', this)">
-        <span>◈</span> <span>Mis Regalías</span>
+        <span>💰</span> <span>Mis Ganancias</span>
       </button>
       <button class="menu-btn" onclick="switchTab('perfil', this)">
-        <span>👤</span> <span>Mi Perfil</span>
+        <span>🏠</span> <span>Mis Datos</span>
       </button>
     </nav>
 
@@ -1041,7 +1043,7 @@ if (!empty($pedidos)) {
                   <p style="margin:4px 0 0; font-size:13px; font-weight:600;"><?php echo date("d M Y, h:i A", strtotime($ped["fecha_pedido"])); ?></p>
                 </div>
                 <div>
-                  <span class="badge-status <?php echo $estado; ?>"><?php echo $ped["estado"]; ?></span>
+                  <span class="badge-status <?php echo $estado; ?>" style="display:inline-block; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 11px; text-transform: uppercase; background: <?php echo $estado === 'pendiente' ? '#ffe3ca' : ($estado === 'cancelado' ? 'rgba(176,37,0,0.1)' : '#d2f3d1'); ?>; color: <?php echo $estado === 'pendiente' ? 'var(--primary)' : ($estado === 'cancelado' ? '#b02500' : 'var(--secondary)'); ?>;"><?php echo $ped["estado"]; ?></span>
                 </div>
                 <div>
                   <span class="order-total" style="font-size:18px; font-weight:800; color:var(--secondary);">$<?php echo number_format($ped["total"], 2); ?></span>
@@ -1054,6 +1056,61 @@ if (!empty($pedidos)) {
                     <button class="order-btn cancel" id="cancel-btn-<?php echo $ped['id']; ?>" onclick="confirmCancelOrder(<?php echo $ped['id']; ?>)" style="border:1px solid rgba(176,37,0,0.2); background:rgba(176,37,0,0.03); color:#b02500; padding:10px 18px; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">Cancelar</button>
                   <?php endif; ?>
                 </div>
+              </div>
+
+              <!-- LÍNEA DE TIEMPO VISUAL ACCESIBLE -->
+              <div style="padding: 20px 24px; border-bottom: 1px solid rgba(213, 164, 112, 0.08); background: #fefdfa;">
+                <?php
+                $step = 1;
+                if ($estado === 'preparado') $step = 2;
+                elseif ($estado === 'en_ruta') $step = 3;
+                elseif ($estado === 'entregado') $step = 4;
+                elseif ($estado === 'cancelado') $step = -1;
+                ?>
+                <?php if ($step === -1): ?>
+                  <div style="display: flex; align-items: center; gap: 8px; color: #b02500; font-weight: 800; font-size: 13px; background: rgba(176,37,0,0.04); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(176,37,0,0.1);">
+                    <span>❌</span> <span>Este pedido fue CANCELADO y el stock fue devuelto.</span>
+                  </div>
+                <?php else: ?>
+                  <div style="display: flex; justify-content: space-between; position: relative; margin: 10px 0 5px; padding: 0 10px;">
+                    <!-- Línea de fondo -->
+                    <div style="position: absolute; top: 12px; left: 10%; right: 10%; height: 4px; background: #e8ded4; z-index: 1;"></div>
+                    <!-- Línea de progreso activo -->
+                    <div style="position: absolute; top: 12px; left: 10%; width: <?php echo (($step - 1) * 26.6); ?>%; height: 4px; background: #176a21; z-index: 2; transition: width 0.4s ease;"></div>
+                    
+                    <!-- Paso 1 -->
+                    <div style="display: flex; flex-direction: column; align-items: center; z-index: 3; width: 25%;">
+                      <div style="width: 28px; height: 28px; border-radius: 50%; background: <?php echo $step >= 1 ? '#176a21' : '#e8ded4'; ?>; color: white; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                        <?php echo $step >= 1 ? '✓' : '1'; ?>
+                      </div>
+                      <span style="font-size: 11px; font-weight: 800; margin-top: 6px; color: <?php echo $step >= 1 ? '#176a21' : '#704d25'; ?>; text-align: center;">🥚 Recibido</span>
+                    </div>
+                    
+                    <!-- Paso 2 -->
+                    <div style="display: flex; flex-direction: column; align-items: center; z-index: 3; width: 25%;">
+                      <div style="width: 28px; height: 28px; border-radius: 50%; background: <?php echo $step >= 2 ? '#176a21' : '#e8ded4'; ?>; color: white; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                        <?php echo $step >= 2 ? '✓' : '2'; ?>
+                      </div>
+                      <span style="font-size: 11px; font-weight: 800; margin-top: 6px; color: <?php echo $step >= 2 ? '#176a21' : '#704d25'; ?>; text-align: center;">📦 Empacado</span>
+                    </div>
+                    
+                    <!-- Paso 3 -->
+                    <div style="display: flex; flex-direction: column; align-items: center; z-index: 3; width: 25%;">
+                      <div style="width: 28px; height: 28px; border-radius: 50%; background: <?php echo $step >= 3 ? '#176a21' : '#e8ded4'; ?>; color: white; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                        <?php echo $step >= 3 ? '✓' : '3'; ?>
+                      </div>
+                      <span style="font-size: 11px; font-weight: 800; margin-top: 6px; color: <?php echo $step >= 3 ? '#176a21' : '#704d25'; ?>; text-align: center;">🚚 En Camino</span>
+                    </div>
+                    
+                    <!-- Paso 4 -->
+                    <div style="display: flex; flex-direction: column; align-items: center; z-index: 3; width: 25%;">
+                      <div style="width: 28px; height: 28px; border-radius: 50%; background: <?php echo $step >= 4 ? '#176a21' : '#e8ded4'; ?>; color: white; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                        <?php echo $step >= 4 ? '✓' : '4'; ?>
+                      </div>
+                      <span style="font-size: 11px; font-weight: 800; margin-top: 6px; color: <?php echo $step >= 4 ? '#176a21' : '#704d25'; ?>; text-align: center;">🎉 Entregado</span>
+                    </div>
+                  </div>
+                <?php endif; ?>
               </div>
 
               <div class="order-details-pane" id="order-details-<?php echo $ped['id']; ?>" style="padding:24px; background:#fafaf8; border-top:1px solid var(--glass-border); display:none;">
@@ -1095,29 +1152,32 @@ if (!empty($pedidos)) {
     <section id="tab-regalias" class="tab-pane">
       <div class="referrals-metrics" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:24px; margin-bottom:35px;">
         <div style="background:white; border-radius:24px; padding:24px; border:1px solid var(--glass-border); box-shadow:var(--shadow-premium);">
-          <span style="font-size:12px; font-weight:800; color:var(--text-medium); text-transform:uppercase;">Pendiente</span>
+          <span style="font-size:12px; font-weight:800; color:var(--text-medium); text-transform:uppercase;">Dinero Ganado (Por Cobrar) 💰</span>
           <div style="font-size:32px; font-weight:800; color:var(--primary); margin-top:10px;">$<?php echo number_format($comisionPendiente, 2); ?></div>
         </div>
         <div style="background:white; border-radius:24px; padding:24px; border:1px solid var(--glass-border); box-shadow:var(--shadow-premium);">
-          <span style="font-size:12px; font-weight:800; color:var(--text-medium); text-transform:uppercase;">Cobrado</span>
+          <span style="font-size:12px; font-weight:800; color:var(--text-medium); text-transform:uppercase;">Dinero Cobrado 🎉</span>
           <div style="font-size:32px; font-weight:800; color:var(--secondary); margin-top:10px;">$<?php echo number_format($comisionPagada, 2); ?></div>
         </div>
         <div style="background:linear-gradient(135deg, var(--secondary), #2ea33c); border-radius:24px; padding:24px; color:white; box-shadow:var(--shadow-premium);">
-          <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.85); text-transform:uppercase;">Total Acumulado</span>
+          <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.85); text-transform:uppercase;">Total Ganado Histórico 📈</span>
           <div style="font-size:32px; font-weight:800; margin-top:10px;">$<?php echo number_format($comisionTotal, 2); ?></div>
         </div>
       </div>
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
         <div style="background:white; border-radius:28px; padding:30px; border:1px solid var(--glass-border); box-shadow:var(--shadow-premium);">
-          <h3 style="margin:0 0 15px; font-size:20px; font-weight:800; color:var(--text-dark);">¡Invita a tus amigos y gana!</h3>
+          <h3 style="margin:0 0 15px; font-size:20px; font-weight:800; color:var(--text-dark);">¡Invita a tus vecinos y gana dinero! 👩‍🌾👨‍🌾</h3>
           <p style="font-size:14px; color:var(--text-medium); line-height:1.6; margin-bottom:20px;">
-            Comparte tu código exclusivo de EcoAli. Cuando tus amigos completen su registro e ingresen tu código al realizar sus pedidos de deliciosos huevos frescos, **tú recibirás automáticamente el 10% de comisión** en regalías de por vida en todas sus compras.
+            Comparte tu código exclusivo de EcoAli con tus vecinos y amigos. Cuando ellos se registren y lo ingresen al comprar sus huevos frescos, **¡tú ganarás el 10% del total de su compra automáticamente!**
           </p>
           <div style="background:rgba(255, 138, 0, 0.05); border:2px dashed rgba(255,138,0,0.3); border-radius:20px; padding:20px; text-align:center;">
-            <small style="font-size:10px; font-weight:800; color:var(--primary);">TU CÓDIGO DE INVITACIÓN</small>
+            <small style="font-size:10px; font-weight:800; color:var(--primary);">TU CÓDIGO PARA COMPARTIR</small>
             <strong style="font-family:'Plus Jakarta Sans', sans-serif; font-size:32px; display:block; margin:8px 0; font-weight:800; letter-spacing:2px;"><?php echo $codigoReferido; ?></strong>
-            <button onclick="copyReferralCode('<?php echo $codigoReferido; ?>')" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer;">Copiar Código</button>
+            <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:12px;">
+              <button onclick="copyReferralCode('<?php echo $codigoReferido; ?>')" style="background:var(--primary); color:white; border:none; padding:12px 24px; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer;">📋 Copiar Código</button>
+              <button onclick="shareOnWhatsApp('<?php echo $codigoReferido; ?>')" style="background:#25d366; color:white; border:none; padding:12px 24px; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">💬 Compartir por WhatsApp</button>
+            </div>
           </div>
         </div>
 
@@ -1269,7 +1329,7 @@ if (!empty($pedidos)) {
 
 <!-- Modal: Checkout Multi-Step con Pasarelas Simuladas (Requirement 2 & 3) -->
 <div class="modal-overlay" id="checkout-modal">
-  <div class="modal-container" style="max-width:540px; padding:30px;">
+  <div class="modal-container" style="max-width:540px; padding:30px; max-height:90vh; overflow-y:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
       <div style="font-size:20px; font-weight:800;" id="checkout-modal-title">Checkout de Compra</div>
       <button onclick="closeCheckoutWizard()" style="background:none; border:none; font-size:24px; cursor:pointer;">×</button>
@@ -1280,63 +1340,78 @@ if (!empty($pedidos)) {
       <h4 style="margin:0 0 10px; color:var(--text-dark); font-size:15px;">Paso 1: Dirección y Teléfono de Despacho</h4>
       <p style="font-size:13px; color:var(--text-medium); line-height:1.5; margin-bottom:20px;">Confirma dónde quieres que el repartidor entregue tus huevos frescos.</p>
       
+      <!-- Selector de Tipo de Dirección -->
+      <div style="display:flex; gap:10px; margin-bottom:15px; background:rgba(213,164,112,0.08); padding:6px; border-radius:12px; border:1px solid rgba(213,164,112,0.15);">
+        <button type="button" id="dir-mode-det" onclick="setDirMode('detailed')" style="flex:1; border:none; background:white; color:var(--text-dark); padding:8px 12px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.05); transition:all 0.2s;">Dirección de Ciudad (Detallada)</button>
+        <button type="button" id="dir-mode-simp" onclick="setDirMode('simple')" style="flex:1; border:none; background:transparent; color:var(--text-medium); padding:8px 12px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer; transition:all 0.2s;">Dirección del Campo (Ranchos/Ejidos)</button>
+      </div>
+
       <div style="display:flex; flex-direction:column; gap:16px;">
-        <!-- Fila 1: Calle y Número (2 columnas) -->
-        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CALLE *</label>
-            <input type="text" id="chk-calle" value="<?php echo htmlspecialchars($savedCalle); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Av. de la Constitución">
+        <!-- CONTENEDOR DIRECCIÓN DETALLADA -->
+        <div id="dir-detailed-container" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Fila 1: Calle y Número (2 columnas) -->
+          <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CALLE *</label>
+              <input type="text" id="chk-calle" value="<?php echo htmlspecialchars($savedCalle); ?>" oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Av. de la Constitución">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">NÚMERO *</label>
+              <input type="text" id="chk-numero" value="<?php echo htmlspecialchars($savedNumero); ?>" oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 45">
+            </div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">NÚMERO *</label>
-            <input type="text" id="chk-numero" value="<?php echo htmlspecialchars($savedNumero); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 45">
+
+          <!-- Fila 2: Colonia y Código Postal (2 columnas) -->
+          <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">COLONIA / BARRIO *</label>
+              <input type="text" id="chk-colonia" value="<?php echo htmlspecialchars($savedColonia); ?>" oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Centro">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CÓDIGO POSTAL *</label>
+              <input type="text" id="chk-cp" value="<?php echo htmlspecialchars($savedCP); ?>" oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 41001">
+            </div>
+          </div>
+
+          <!-- Fila 3: Entidad Federativa y Localidad (2 columnas) -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">ENTIDAD FEDERATIVA *</label>
+              <select id="chk-estado" onchange="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px; background-color:white; outline:none; cursor:pointer;">
+                <option value="">Selecciona...</option>
+                <?php
+                $mexicanStates = [
+                    "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas",
+                    "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango",
+                    "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco",
+                    "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
+                    "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
+                    "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz",
+                    "Yucatán", "Zacatecas"
+                ];
+                foreach ($mexicanStates as $state) {
+                    $selected = ($savedEntidad === $state) ? 'selected' : '';
+                    echo "<option value=\"$state\" $selected>$state</option>";
+                }
+                ?>
+              </select>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:11px; font-weight:800; color:var(--text-medium);">LOCALIDAD / MUNICIPIO *</label>
+              <input type="text" id="chk-localidad" value="<?php echo htmlspecialchars($savedLocalidad); ?>" oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Ecatepec">
+            </div>
           </div>
         </div>
 
-        <!-- Fila 2: Colonia y Código Postal (2 columnas) -->
-        <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:12px;">
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">COLONIA / BARRIO *</label>
-            <input type="text" id="chk-colonia" value="<?php echo htmlspecialchars($savedColonia); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Centro">
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">CÓDIGO POSTAL *</label>
-            <input type="text" id="chk-cp" value="<?php echo htmlspecialchars($savedCP); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: 41001">
-          </div>
-        </div>
-
-        <!-- Fila 3: Entidad Federativa y Localidad (2 columnas) -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">ENTIDAD FEDERATIVA *</label>
-            <select id="chk-estado" required onchange="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px; background-color:white; outline:none; cursor:pointer;">
-              <option value="">Selecciona...</option>
-              <?php
-              $mexicanStates = [
-                  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas",
-                  "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango",
-                  "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco",
-                  "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
-                  "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
-                  "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz",
-                  "Yucatán", "Zacatecas"
-              ];
-              foreach ($mexicanStates as $state) {
-                  $selected = ($savedEntidad === $state) ? 'selected' : '';
-                  echo "<option value=\"$state\" $selected>$state</option>";
-              }
-              ?>
-            </select>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:11px; font-weight:800; color:var(--text-medium);">LOCALIDAD / MUNICIPIO *</label>
-            <input type="text" id="chk-localidad" value="<?php echo htmlspecialchars($savedLocalidad); ?>" required oninput="updateConcatenatedAddress()" style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px;" placeholder="Ej: Ecatepec">
-          </div>
+        <!-- CONTENEDOR DIRECCIÓN SIMPLE -->
+        <div id="dir-simple-container" style="display:none; flex-direction:column; gap:8px;">
+          <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN DETALLADA O REFERENCIAS DE TU RANCHO/EJIDO *</label>
+          <textarea id="chk-direccion-simple" oninput="updateSimpleAddress()" style="width:100%; height:110px; border-radius:12px; border:1px solid var(--glass-border); padding:12px; font-family:inherit; color:var(--text-dark); font-weight:600; font-size:13px; resize:none; line-height:1.5; outline:none;" placeholder="Escribe el nombre de tu rancho, camino rural, referencias del lugar y municipio (Ej: Rancho La Esperanza, portón verde junto al depósito de agua de la comunidad, Municipio de Allende)."><?php echo htmlspecialchars($direccion); ?></textarea>
         </div>
 
         <!-- Fila 4: Dirección Completa Generada (Solo Lectura) -->
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN COMPLETA FORMATEADA (VISTA PREVIA)</label>
+          <label style="font-size:11px; font-weight:800; color:var(--text-medium);">DIRECCIÓN FINAL DE ENTREGA</label>
           <input type="text" id="chk-direccion" value="<?php echo htmlspecialchars($direccion); ?>" readonly style="height:48px; border-radius:12px; border:1px solid var(--glass-border); padding:0 12px; background:#fbf8f5; color:#705b44; cursor:not-allowed; font-family:inherit; font-weight:600; font-size:13px;" placeholder="Se generará automáticamente conforme llenes los campos...">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
@@ -1359,18 +1434,22 @@ if (!empty($pedidos)) {
       <h4 style="margin:0 0 10px; color:var(--text-dark); font-size:15px;">Paso 2: Selecciona la Pasarela de Pago</h4>
       <p style="font-size:13px; color:var(--text-medium); line-height:1.5; margin-bottom:20px;">Todas las transacciones se realizan de forma segura y encriptada.</p>
       
-      <div class="payment-methods-grid">
+      <div class="payment-methods-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin: 15px 0;">
         <div class="pay-card-option active" id="pay-opt-stripe" onclick="selectPaymentMethod('stripe')">
-          <div>💳</div>
-          <span>Stripe</span>
+          <div style="font-size: 20px;">💳</div>
+          <span style="font-size: 11px;">Stripe</span>
         </div>
         <div class="pay-card-option" id="pay-opt-paypal" onclick="selectPaymentMethod('paypal')">
-          <div>🅿️</div>
-          <span>PayPal</span>
+          <div style="font-size: 20px;">🅿️</div>
+          <span style="font-size: 11px;">PayPal</span>
         </div>
         <div class="pay-card-option" id="pay-opt-mercado" onclick="selectPaymentMethod('mercado_pago')">
-          <div>🟩</div>
-          <span>Mercado Pago</span>
+          <div style="font-size: 20px;">🟩</div>
+          <span style="font-size: 11px;">Mercado Pago</span>
+        </div>
+        <div class="pay-card-option" id="pay-opt-efectivo" onclick="selectPaymentMethod('efectivo')">
+          <div style="font-size: 20px;">💵</div>
+          <span style="font-size: 11px; font-weight: 800;">Efectivo (Al Recibir)</span>
         </div>
       </div>
 
@@ -1489,6 +1568,27 @@ if (!empty($pedidos)) {
         </div>
       </div>
 
+      <!-- SUB-PANE: PAGO EN EFECTIVO (CONTRA ENTREGA) -->
+      <div id="pane-pay-efectivo" style="display:none;">
+        <h4 style="margin:0 0 10px; color:var(--text-dark); font-size:15px;">Pago en Efectivo (Al Recibir) 💵</h4>
+        <p style="font-size:13px; color:var(--text-medium); line-height:1.6; margin-bottom:20px;">
+          ¡No necesitas ingresar tarjetas! Pagarás el total directamente al repartidor de EcoAli cuando entregue tus huevos frescos en tu puerta.
+        </p>
+
+        <div style="text-align:center; padding:30px 20px; background:#effeed; border-radius:20px; border:1px dashed #176a21; margin:20px 0;">
+          <div style="font-size:32px; margin-bottom:10px;">💵</div>
+          <strong style="color:#176a21; display:block; font-size:16px;">Pago Contra Entrega Autorizado</strong>
+          <span style="font-size:12px; color:var(--text-medium);">Total a pagar en efectivo: <strong id="efectivo-amount">$0.00</strong></span>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-top:25px;">
+          <button onclick="goToCheckoutStep(2)" style="background:rgba(213,164,112,0.1); color:var(--text-medium); border:none; height:48px; border-radius:12px; font-weight:800; padding:0 24px; cursor:pointer;">Atrás</button>
+          <button onclick="simulateThirdPartyPayment('efectivo')" style="background:linear-gradient(135deg, var(--secondary), #2ea33c); color:white; border:none; height:48px; border-radius:12px; font-weight:800; padding:0 30px; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            Confirmar Pedido ➜
+          </button>
+        </div>
+      </div>
+
     </div>
 
   </div>
@@ -1598,10 +1698,10 @@ if (!empty($pedidos)) {
       });
 
       const titles = {
-          'catalogo': { title: 'Catálogo de Productos', subtitle: 'Frescura directa del campo a tu mesa.' },
-          'pedidos': { title: 'Tus Pedidos', subtitle: 'Monitorea el estado y el historial de tus entregas.' },
-          'regalias': { title: 'Regalías y Referidos', subtitle: 'Gana comisiones invitando amigos a la red EcoAli.' },
-          'perfil': { title: 'Tu Perfil', subtitle: 'Actualiza tus datos de contacto y facturación.' }
+          'catalogo': { title: 'Comprar Huevos Frescos 🥚', subtitle: 'Elige los huevos que quieras y agrégalos a tu carrito.' },
+          'pedidos': { title: 'Mis Compras Realizadas 📦', subtitle: 'Aquí puedes ver el camino que recorren tus pedidos.' },
+          'regalias': { title: 'Mis Ganancias por Compartir 💰', subtitle: 'Gana dinero invitando a tus vecinos a comprar en EcoAli.' },
+          'perfil': { title: 'Mis Datos y Dirección 🏠', subtitle: 'Mantén al día tus datos para que el repartidor llegue a tu casa.' }
       };
 
       if (titles[tabName]) {
@@ -2049,6 +2149,7 @@ if (!empty($pedidos)) {
       const total = document.getElementById('cart-total').textContent;
       document.getElementById('paypal-amount').textContent = total;
       document.getElementById('mercado-amount').textContent = total;
+      document.getElementById('efectivo-amount').textContent = total;
 
       document.getElementById('checkout-modal').classList.add('active');
       goToCheckoutStep(1);
@@ -2125,14 +2226,18 @@ if (!empty($pedidos)) {
       const idMap = {
           'stripe': 'pay-opt-stripe',
           'paypal': 'pay-opt-paypal',
-          'mercado_pago': 'pay-opt-mercado'
+          'mercado_pago': 'pay-opt-mercado',
+          'efectivo': 'pay-opt-efectivo'
       };
-      document.getElementById(idMap[method]).classList.add('active');
+      if (idMap[method]) {
+          document.getElementById(idMap[method]).classList.add('active');
+      }
 
       // Mostrar/Ocultar páneles correspondientes del paso 3
       document.getElementById('pane-pay-stripe').style.display = method === 'stripe' ? 'block' : 'none';
       document.getElementById('pane-pay-paypal').style.display = method === 'paypal' ? 'block' : 'none';
       document.getElementById('pane-pay-mercado_pago').style.display = method === 'mercado_pago' ? 'block' : 'none';
+      document.getElementById('pane-pay-efectivo').style.display = method === 'efectivo' ? 'block' : 'none';
   }
 
   // Stripe Flip Card Logic
@@ -2213,18 +2318,33 @@ if (!empty($pedidos)) {
   function simulateThirdPartyPayment(platform) {
       if (isCheckoutProcessing) return;
       
-      const label = platform === 'paypal' ? 'PayPal Secure Login...' : 'Mercado Pago Checkout...';
-      const confirmMsg = platform === 'paypal' 
-          ? '¿Simular ingreso de sesión y autorizar pago seguro con PayPal?' 
-          : '¿Simular y autorizar débito PSE / Mercado Pago?';
+      let label = 'Procesando Pago...';
+      let confirmMsg = '¿Confirmar pago?';
+      let loadingTitle = 'Procesando';
+      let loadingMsg = 'Conectando con el servidor...';
+      
+      if (platform === 'paypal') {
+          label = 'PayPal Secure Login...';
+          confirmMsg = '¿Simular ingreso de sesión y autorizar pago seguro con PayPal?';
+          loadingMsg = 'Conectando con la pasarela de PayPal...';
+      } else if (platform === 'mercado_pago') {
+          label = 'Mercado Pago Checkout...';
+          confirmMsg = '¿Simular y autorizar débito PSE / Mercado Pago?';
+          loadingMsg = 'Conectando con la pasarela de Mercado Pago...';
+      } else if (platform === 'efectivo') {
+          label = 'Confirmando Pedido...';
+          confirmMsg = '¿Confirmar pedido con pago en efectivo al recibir?';
+          loadingMsg = 'Guardando tu pedido contra entrega...';
+      }
 
       if (!confirm(confirmMsg)) return;
 
-      showAlertModal('Procesando', `Conectando con la pasarela de ${platform}...`, '⏳', 'var(--primary)');
+      showAlertModal(loadingTitle, loadingMsg, '⏳', 'var(--primary)');
       
       setTimeout(() => {
           closeAlertModal();
-          executeFinalPurchase(platform, 'aprobado');
+          const paymentStatus = platform === 'efectivo' ? 'pendiente' : 'aprobado';
+          executeFinalPurchase(platform, paymentStatus);
       }, 1500);
   }
 
@@ -2369,10 +2489,71 @@ if (!empty($pedidos)) {
       });
   }
 
+  let addressMode = 'detailed';
+
+  function setDirMode(mode) {
+      addressMode = mode;
+      const btnDet = document.getElementById('dir-mode-det');
+      const btnSimp = document.getElementById('dir-mode-simp');
+      const containerDet = document.getElementById('dir-detailed-container');
+      const containerSimp = document.getElementById('dir-simple-container');
+
+      if (mode === 'detailed') {
+          btnDet.style.background = 'white';
+          btnDet.style.color = 'var(--text-dark)';
+          btnDet.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
+          btnSimp.style.background = 'transparent';
+          btnSimp.style.color = 'var(--text-medium)';
+          btnSimp.style.boxShadow = 'none';
+
+          containerDet.style.display = 'flex';
+          containerSimp.style.display = 'none';
+
+          // Activar obligatorios
+          document.getElementById('chk-calle').required = true;
+          document.getElementById('chk-numero').required = true;
+          document.getElementById('chk-colonia').required = true;
+          document.getElementById('chk-cp').required = true;
+          document.getElementById('chk-estado').required = true;
+          document.getElementById('chk-localidad').required = true;
+          updateConcatenatedAddress();
+      } else {
+          btnSimp.style.background = 'white';
+          btnSimp.style.color = 'var(--text-dark)';
+          btnSimp.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
+          btnDet.style.background = 'transparent';
+          btnDet.style.color = 'var(--text-medium)';
+          btnDet.style.boxShadow = 'none';
+
+          containerDet.style.display = 'none';
+          containerSimp.style.display = 'flex';
+
+          // Desactivar obligatorios
+          document.getElementById('chk-calle').required = false;
+          document.getElementById('chk-numero').required = false;
+          document.getElementById('chk-colonia').required = false;
+          document.getElementById('chk-cp').required = false;
+          document.getElementById('chk-estado').required = false;
+          document.getElementById('chk-localidad').required = false;
+          updateSimpleAddress();
+      }
+  }
+
+  function updateSimpleAddress() {
+      const text = document.getElementById('chk-direccion-simple').value.trim();
+      document.getElementById('chk-direccion').value = text;
+  }
+
   function copyReferralCode(code) {
       navigator.clipboard.writeText(code).then(() => {
-          alert('¡Código de referido copiado al portapapeles!');
+          showAlertModal('¡Copiado!', 'Tu código de invitación ha sido copiado al portapapeles. Pégalo donde quieras para compartirlo.', '✓', 'var(--secondary)');
       });
+  }
+
+  function shareOnWhatsApp(code) {
+      const text = `¡Hola! Te recomiendo comprar en EcoAli, tienen huevos frescos de excelente calidad directos del campo a tu mesa. Regístrate usando mi código de invitación para recibir beneficios: ${code}`;
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
   }
 
   let reloadOnClose = false;
@@ -2400,20 +2581,20 @@ if (!empty($pedidos)) {
 <!-- Barra de Navegación Inferior Móvil (Requirement 1 & 2) -->
 <nav class="mobile-nav" style="display:none; position:fixed; bottom:0; left:0; width:100%; height:50px; background:rgba(255, 255, 255, 0.98); box-shadow:0 -5px 20px rgba(70, 40, 0, 0.05); border-top:1px solid rgba(213, 164, 112, 0.15); z-index:999999; grid-template-columns:repeat(4, 1fr); align-items:center;">
   <button class="mobile-nav-btn active" onclick="switchTab('catalogo', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
-    <span style="font-size:15px; transition:transform 0.2s ease;">▦</span>
-    <span>Catálogo</span>
+    <span style="font-size:15px; transition:transform 0.2s ease;">🥚</span>
+    <span>Comprar</span>
   </button>
   <button class="mobile-nav-btn" onclick="switchTab('pedidos', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
-    <span style="font-size:15px; transition:transform 0.2s ease;">▤</span>
-    <span>Pedidos</span>
+    <span style="font-size:15px; transition:transform 0.2s ease;">📦</span>
+    <span>Mis Compras</span>
   </button>
   <button class="mobile-nav-btn" onclick="switchTab('regalias', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
-    <span style="font-size:15px; transition:transform 0.2s ease;">◈</span>
-    <span>Regalías</span>
+    <span style="font-size:15px; transition:transform 0.2s ease;">💰</span>
+    <span>Ganancias</span>
   </button>
   <button class="mobile-nav-btn" onclick="switchTab('perfil', this)" style="background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:var(--text-medium); font-size:12px; font-weight:800; cursor:pointer;">
-    <span style="font-size:15px; transition:transform 0.2s ease;">👤</span>
-    <span>Perfil</span>
+    <span style="font-size:15px; transition:transform 0.2s ease;">🏠</span>
+    <span>Mis Datos</span>
   </button>
 </nav>
 
@@ -2423,6 +2604,197 @@ if (!empty($pedidos)) {
     to { transform: rotate(360deg); }
   }
 </style>
+
+<!-- ASISTENTE VIRTUAL ACCESIBLE: DOÑA ALI -->
+<div id="dona-ali-container" style="position:fixed; bottom:80px; right:24px; z-index:99999; display:flex; flex-direction:column; align-items:flex-end; gap:12px; font-family:inherit;">
+  
+  <!-- Burbuja de Diálogo de Doña Ali -->
+  <div id="dona-ali-bubble" style="display:none; width:300px; background:white; border-radius:20px; border:1px solid rgba(213, 164, 112, 0.25); box-shadow:0 10px 30px rgba(0,0,0,0.15); padding:20px; flex-direction:column; gap:12px; transition:all 0.3s ease;">
+    <!-- Encabezado de la Burbuja -->
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(213,164,112,0.15); padding-bottom:8px;">
+      <span style="font-weight:800; color:var(--text-dark); font-size:14px; display:inline-flex; align-items:center; gap:6px;">👵 Doña Ali Asistente</span>
+      <button onclick="toggleDonaAliBubble()" style="background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-medium); line-height:1;">×</button>
+    </div>
+    
+    <!-- Texto de Respuesta -->
+    <p id="dona-ali-text" style="margin:0; font-size:13px; color:var(--text-medium); line-height:1.6; font-weight:700;">¡Hola! Soy Doña Ali. Estoy aquí para guiarte en tu compra de huevos frescos. Haz clic en cualquiera de mis preguntas de abajo o escríbeme si necesitas ayuda.</p>
+    
+    <!-- Opciones / Preguntas frecuentes -->
+    <div id="dona-ali-options" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+      <button onclick="askDonaAli('compra')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">🥚 ¿Cómo compro mis huevos?</button>
+      <button onclick="askDonaAli('referido')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">💰 ¿Cómo gano por compartir?</button>
+      <button onclick="askDonaAli('efectivo')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">💵 ¿Puedo pagar en efectivo al recibir?</button>
+      <button onclick="askDonaAli('campo')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">🚜 ¿Entregan en ranchos y ejidos?</button>
+    </div>
+
+    <!-- Controles de Voz -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; border-top:1px solid rgba(213,164,112,0.1); padding-top:8px;">
+      <button id="dona-ali-speak-btn" onclick="readDonaResponse()" style="background:none; border:none; cursor:pointer; font-size:12px; font-weight:800; color:var(--text-medium);" title="Escuchar respuesta">🔊 Escuchar</button>
+      <button id="dona-ali-listen-btn" onclick="listenToUser()" style="background:none; border:none; cursor:pointer; font-size:12px; font-weight:800; color:#b02500;" title="Hablarle a Doña Ali">🎙️ Hablarle</button>
+    </div>
+  </div>
+
+  <!-- Botón Circular Flotante (Trigger) -->
+  <button onclick="toggleDonaAliBubble()" style="width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, var(--primary), #e07b00); border:none; color:white; font-size:28px; cursor:pointer; box-shadow:0 8px 25px rgba(255,138,0,0.35); display:grid; place-items:center; transition:transform 0.2s ease-in-out;" onmouseover="this.style.transform='scale(1.08)';" onmouseout="this.style.transform='scale(1)';">
+    👵
+  </button>
+</div>
+
+<script>
+  let donaSpeechUtterance = null;
+  let voiceRecognition = null;
+
+  function toggleDonaAliBubble() {
+      const bubble = document.getElementById('dona-ali-bubble');
+      if (bubble.style.display === 'none' || bubble.style.display === '') {
+          bubble.style.display = 'flex';
+          speakText("Hola, soy Doña Ali. ¿En qué puedo ayudarte hoy?");
+      } else {
+          bubble.style.display = 'none';
+          if (window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+          }
+      }
+  }
+
+  function askDonaAli(topic) {
+      const textEl = document.getElementById('dona-ali-text');
+      let response = '';
+
+      if (topic === 'compra') {
+          response = 'Para comprar tus huevos, ve a la pestaña "Comprar Huevos 🥚". Elige los paquetes que quieras, agrégalos a tu carrito haciendo clic en el botón naranja, y luego presiona "Proceder al Checkout" para ingresar tu dirección.';
+      } else if (topic === 'referido') {
+          response = 'Puedes ganar comisiones recomendándonos. Entra a la pestaña "Mis Ganancias 💰", copia tu código único o compártelo directamente en el grupo de WhatsApp con tus vecinos. ¡Recibirás el 10% en efectivo de todo lo que ellos compren de por vida!';
+      } else if (topic === 'efectivo') {
+          response = '¡Claro que sí! Puedes elegir la opción de Pago en Efectivo Contra Entrega en la pantalla de pago. Así, no tienes que meter tarjetas; le pagas directamente en efectivo a nuestro repartidor cuando te entregue los huevos en tu puerta.';
+      } else if (topic === 'campo') {
+          response = '¡Por supuesto! Repartimos en comunidades rurales y ejidos. Al llenar tu dirección de entrega, selecciona la pestaña "Dirección del Campo" y escribe referencias claras de cómo llegar a tu rancho o parcela. El repartidor llegará sin problemas.';
+      } else {
+          response = 'Hola, hijo. Soy Doña Ali. Estoy aquí para hacerte las cosas bien fáciles y directas.';
+      }
+
+      textEl.textContent = response;
+      speakText(response);
+  }
+
+  let selectedFemaleVoice = null;
+  function loadVoices() {
+      if (!window.speechSynthesis) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return;
+      const spanishVoices = voices.filter(v => v.lang.includes('es') || v.lang.includes('ES'));
+      let found = spanishVoices.find(v => {
+          const nameLower = v.name.toLowerCase();
+          return nameLower.includes('sabina') || 
+                 nameLower.includes('dalia') || 
+                 nameLower.includes('yolanda') || 
+                 nameLower.includes('helena') || 
+                 nameLower.includes('laura') || 
+                 nameLower.includes('hilda') || 
+                 nameLower.includes('female') ||
+                 nameLower.includes('zira') ||
+                 nameLower.includes('dona') ||
+                 nameLower.includes('mujer') ||
+                 nameLower.includes('google');
+      });
+      if (!found) {
+          found = spanishVoices.find(v => {
+              const nameLower = v.name.toLowerCase();
+              return !nameLower.includes('david') && 
+                     !nameLower.includes('raul') && 
+                     !nameLower.includes('carlos') && 
+                     !nameLower.includes('jorge') && 
+                     !nameLower.includes('male') && 
+                     !nameLower.includes('hombre');
+          });
+      }
+      if (!found && spanishVoices.length > 0) {
+          found = spanishVoices[0];
+      }
+      selectedFemaleVoice = found;
+  }
+  if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices();
+  }
+
+  function speakText(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      
+      donaSpeechUtterance = new SpeechSynthesisUtterance(text);
+      donaSpeechUtterance.lang = 'es-MX';
+      
+      if (!selectedFemaleVoice) {
+          loadVoices();
+      }
+      if (selectedFemaleVoice) {
+          donaSpeechUtterance.voice = selectedFemaleVoice;
+      }
+      window.speechSynthesis.speak(donaSpeechUtterance);
+  }
+
+  function readDonaResponse() {
+      const text = document.getElementById('dona-ali-text').textContent;
+      speakText(text);
+  }
+
+  function listenToUser() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+          alert("Tu navegador no soporta el reconocimiento de voz. Te recomiendo usar Google Chrome.");
+          return;
+      }
+
+      const listenBtn = document.getElementById('dona-ali-listen-btn');
+      listenBtn.textContent = "🎙️ Escuchando...";
+      listenBtn.style.color = "var(--secondary)";
+
+      voiceRecognition = new SpeechRecognition();
+      voiceRecognition.lang = 'es-MX';
+      voiceRecognition.interimResults = false;
+      voiceRecognition.maxAlternatives = 1;
+
+      voiceRecognition.start();
+
+      voiceRecognition.onresult = function(event) {
+          const phrase = event.results[0][0].transcript.toLowerCase();
+          console.log("Usuario dijo: " + phrase);
+          
+          if (phrase.includes('compra') || phrase.includes('huevo') || phrase.includes('elegir')) {
+              askDonaAli('compra');
+          } else if (phrase.includes('gana') || phrase.includes('dinero') || phrase.includes('compartir') || phrase.includes('referid') || phrase.includes('código')) {
+              askDonaAli('referido');
+          } else if (phrase.includes('efectivo') || phrase.includes('pagar') || phrase.includes('recibir') || phrase.includes('entrega')) {
+              askDonaAli('efectivo');
+          } else if (phrase.includes('campo') || phrase.includes('rancho') || phrase.includes('ejido') || phrase.includes('camino')) {
+              askDonaAli('campo');
+          } else {
+              const defaultResp = "Entendido, dijiste: '" + phrase + "'. Si quieres saber cómo comprar, pagar en efectivo o compartir, haz clic en mis botones de preguntas.";
+              document.getElementById('dona-ali-text').textContent = defaultResp;
+              speakText(defaultResp);
+          }
+      };
+
+      voiceRecognition.onspeechend = function() {
+          voiceRecognition.stop();
+          listenBtn.textContent = "🎙️ Hablarle";
+          listenBtn.style.color = "#b02500";
+      };
+
+      voiceRecognition.onerror = function(event) {
+          console.error("Speech recognition error", event.error);
+          listenBtn.textContent = "🎙️ Hablarle";
+          listenBtn.style.color = "#b02500";
+      };
+  }
+
+  if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.getVoices();
+      };
+  }
+</script>
 
 </body>
 </html>

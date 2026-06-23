@@ -208,35 +208,35 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <nav class="sidebar-menu">
       <a href="dashboard_proveedor.php" class="menu-link <?php echo ($current_page === 'dashboard_proveedor.php') ? 'active' : ''; ?>">
-        <span>▦</span> <span>Dashboard</span>
+        <span>🚜</span> <span>Mi Resumen</span>
       </a>
       <a href="produccion_proveedor.php" class="menu-link <?php echo ($current_page === 'produccion_proveedor.php') ? 'active' : ''; ?>">
-        <span>🚜</span> <span>Producción</span>
+        <span>🥚</span> <span>Registrar Postura (Recolección)</span>
       </a>
       <a href="lotes_proveedor.php" class="menu-link <?php echo ($current_page === 'lotes_proveedor.php') ? 'active' : ''; ?>">
-        <span>▣</span> <span>Lotes</span>
+        <span>📦</span> <span>Mis Lotes de Huevos</span>
       </a>
       <a href="inventario_proveedor.php" class="menu-link <?php echo ($current_page === 'inventario_proveedor.php') ? 'active' : ''; ?>">
-        <span>📦</span> <span>Inventario</span>
+        <span>🧺</span> <span>Mi Almacén (Stock)</span>
       </a>
       <a href="entregas_proveedor.php" class="menu-link <?php echo ($current_page === 'entregas_proveedor.php') ? 'active' : ''; ?>">
-        <span>🚚</span> <span>Entregas al CEDIS</span>
+        <span>🚚</span> <span>Enviar al CEDIS (Entregas)</span>
       </a>
       <a href="trazabilidad_proveedor.php" class="menu-link <?php echo ($current_page === 'trazabilidad_proveedor.php') ? 'active' : ''; ?>">
-        <span>🔀</span> <span>Trazabilidad</span>
+        <span>🔍</span> <span>Origen y Calidad</span>
       </a>
       <a href="reportes_proveedor.php" class="menu-link <?php echo ($current_page === 'reportes_proveedor.php') ? 'active' : ''; ?>">
-        <span>📊</span> <span>Reportes</span>
+        <span>📊</span> <span>Mis Reportes</span>
       </a>
       <a href="editar_perfil.php" class="menu-link <?php echo ($current_page === 'editar_perfil.php') ? 'active' : ''; ?>">
-        <span>👤</span> <span>Mi perfil</span>
+        <span>⚙️</span> <span>Mi Perfil y Granjas</span>
       </a>
     </nav>
 
     <div class="sidebar-footer">
       <a href="logout.php" style="text-decoration:none;">
         <button class="logout-btn">
-          <span>⤶</span> Cerrar Sesión
+          <span>🚪</span> Salir (Cerrar Sesión)
         </button>
       </a>
     </div>
@@ -246,47 +246,84 @@ $current_page = basename($_SERVER['PHP_SELF']);
   <main class="main-content">
     <header class="app-header">
       <div>
-        <h1>Panel de Proveedor</h1>
-        <p>Resumen de operaciones avícolas y entregas logísticas.</p>
+        <h1>Mi Resumen Granja</h1>
+        <p>Revisa cómo va la recolección, tus paquetes listos y envíos programados.</p>
       </div>
       <a href="produccion_proveedor.php" class="header-btn">
-        <span>✚</span> Registrar Postura
+        <span>✚</span> Registrar Postura (Recolección)
       </a>
     </header>
 
     <!-- Métricas del Dashboard -->
     <div class="metrics-grid">
       <div class="metric-card success">
-        <span class="label">Total Producido</span>
+        <span class="label">Huevos Recolectados 🥚</span>
         <span class="value"><?php echo number_format($huevosProducidos); ?> ud</span>
       </div>
       <div class="metric-card success">
-        <span class="label">Stock Disponible</span>
+        <span class="label">Listos en Almacén 🧺</span>
         <span class="value"><?php echo number_format($huevosDisponibles); ?> ud</span>
       </div>
       <div class="metric-card">
-        <span class="label">Lotes Activos</span>
+        <span class="label">Paquetes Activos 📦</span>
         <span class="value"><?php echo $lotesActivos; ?> lotes</span>
       </div>
       <div class="metric-card warn">
-        <span class="label">Próximos a Caducar</span>
+        <span class="label">Por Vencer Pronto ⚠️</span>
         <span class="value"><?php echo $lotesProximos; ?> lotes</span>
       </div>
       <div class="metric-card danger">
-        <span class="label">Lotes Caducados</span>
+        <span class="label">Lotes Vencidos ❌</span>
         <span class="value"><?php echo $lotesCaducados; ?> lotes</span>
       </div>
       <div class="metric-card">
-        <span class="label">Entregas Pendientes</span>
+        <span class="label">Envíos por Recoger 🚚</span>
         <span class="value"><?php echo $entregasPendientes; ?> sol.</span>
       </div>
       <div class="metric-card warn">
-        <span class="label">Entregas en Ruta</span>
+        <span class="label">Repartidor en Camino 🛣️</span>
         <span class="value"><?php echo $entregasEnRuta; ?> ruta</span>
       </div>
       <div class="metric-card success">
-        <span class="label">Entregas Recibidas</span>
+        <span class="label">Entregas Exitosas 🎉</span>
         <span class="value"><?php echo $entregasRecibidas; ?> ent.</span>
+      </div>
+    </div>
+
+    <!-- Guía Rápida para el Granjero 🌾 -->
+    <div class="card" style="padding: 24px; margin-bottom: 30px; background: linear-gradient(to right, #effeed, #fffaf7); border: 1px solid rgba(23,106,33,0.12);">
+      <h3 style="margin-top: 0; margin-bottom: 8px; color: var(--secondary); display: flex; align-items: center; gap: 8px;">
+        <span>🌾</span> Guía Rápida para el Granjero
+      </h3>
+      <p style="font-size: 13.5px; color: var(--text-medium); margin-bottom: 20px;">Sigue estos 3 sencillos pasos para registrar y mandar tus huevos a la ciudad:</p>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <!-- Paso 1 -->
+        <div style="background: white; padding: 18px; border-radius: 16px; border: 1px solid var(--glass-border); display: flex; gap: 14px; align-items: flex-start; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+          <div style="background: rgba(255, 138, 0, 0.1); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 800; flex-shrink: 0;">1</div>
+          <div>
+            <h4 style="margin: 0 0 6px; color: var(--text-dark); font-size: 14px; font-weight: 800;">Registra lo Recolectado</h4>
+            <p style="margin: 0; font-size: 12.5px; color: var(--text-medium); line-height: 1.5;">Ve a <strong>Registrar Postura 🥚</strong> y anota los huevos obtenidos hoy y su granja.</p>
+          </div>
+        </div>
+        
+        <!-- Paso 2 -->
+        <div style="background: white; padding: 18px; border-radius: 16px; border: 1px solid var(--glass-border); display: flex; gap: 14px; align-items: flex-start; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+          <div style="background: rgba(23, 106, 33, 0.1); color: var(--secondary); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 800; flex-shrink: 0;">2</div>
+          <div>
+            <h4 style="margin: 0 0 6px; color: var(--text-dark); font-size: 14px; font-weight: 800;">Revisa tu Almacén</h4>
+            <p style="margin: 0; font-size: 12.5px; color: var(--text-medium); line-height: 1.5;">Mira en <strong>Mi Almacén (Stock) 🧺</strong> para ver todos tus paquetes listos y verificar sus fechas de vencimiento.</p>
+          </div>
+        </div>
+        
+        <!-- Paso 3 -->
+        <div style="background: white; padding: 18px; border-radius: 16px; border: 1px solid var(--glass-border); display: flex; gap: 14px; align-items: flex-start; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+          <div style="background: rgba(255, 138, 0, 0.1); color: var(--primary); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; font-weight: 800; flex-shrink: 0;">3</div>
+          <div>
+            <h4 style="margin: 0 0 6px; color: var(--text-dark); font-size: 14px; font-weight: 800;">Envía a la Ciudad</h4>
+            <p style="margin: 0; font-size: 12.5px; color: var(--text-medium); line-height: 1.5;">Usa <strong>Enviar al CEDIS (Entregas) 🚚</strong> para programar el camión de recogida para tus lotes.</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -447,28 +484,213 @@ $current_page = basename($_SERVER['PHP_SELF']);
   <!-- Mobile Navigation -->
   <nav class="mobile-nav">
     <a href="dashboard_proveedor.php" class="mobile-nav-btn active">
-      <span>▦</span>
-      <span>Dashboard</span>
+      <span>🚜</span>
+      <span>Mi Resumen</span>
     </a>
     <a href="produccion_proveedor.php" class="mobile-nav-btn">
-      <span>🚜</span>
-      <span>Producción</span>
+      <span>🥚</span>
+      <span>Postura</span>
     </a>
-    <a href="lotes_proveedor.php" class="mobile-nav-btn">
-      <span>▣</span>
-      <span>Lotes</span>
+    <a href="inventario_proveedor.php" class="mobile-nav-btn">
+      <span>🧺</span>
+      <span>Almacén</span>
     </a>
     <a href="entregas_proveedor.php" class="mobile-nav-btn">
       <span>🚚</span>
       <span>Entregas</span>
     </a>
     <a href="editar_perfil.php" class="mobile-nav-btn">
-      <span>👤</span>
+      <span>⚙️</span>
       <span>Perfil</span>
     </a>
   </nav>
 
 </div>
+
+<!-- ASISTENTE VIRTUAL ACCESIBLE: DOÑA ALI PARA GRANJEROS -->
+<div id="dona-ali-container" style="position:fixed; bottom:80px; right:24px; z-index:99999; display:flex; flex-direction:column; align-items:flex-end; gap:12px; font-family:inherit;">
+  
+  <!-- Burbuja de Diálogo de Doña Ali -->
+  <div id="dona-ali-bubble" style="display:none; width:300px; background:white; border-radius:20px; border:1px solid rgba(213, 164, 112, 0.25); box-shadow:0 10px 30px rgba(0,0,0,0.15); padding:20px; flex-direction:column; gap:12px; transition:all 0.3s ease;">
+    <!-- Encabezado de la Burbuja -->
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(213,164,112,0.15); padding-bottom:8px;">
+      <span style="font-weight:800; color:var(--text-dark); font-size:14px; display:inline-flex; align-items:center; gap:6px;">👵 Doña Ali Asistente</span>
+      <button onclick="toggleDonaAliBubble()" style="background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-medium); line-height:1;">×</button>
+    </div>
+    
+    <!-- Texto de Respuesta -->
+    <p id="dona-ali-text" style="margin:0; font-size:13px; color:var(--text-medium); line-height:1.6; font-weight:700;">¡Hola, granjero! Soy Doña Ali. Estoy aquí para ayudarte a manejar tus huevos y registros. Haz clic en una pregunta o cuéntame qué necesitas.</p>
+    
+    <!-- Opciones / Preguntas frecuentes -->
+    <div id="dona-ali-options" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+      <button onclick="askDonaAli('postura')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">🥚 ¿Cómo registro recolección?</button>
+      <button onclick="askDonaAli('lotes')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">📦 ¿Qué es un lote?</button>
+      <button onclick="askDonaAli('envio')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">🚚 ¿Cómo envío a la ciudad?</button>
+      <button onclick="askDonaAli('insumos')" style="text-align:left; background:#faf7f3; border:1px solid rgba(213,164,112,0.2); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:800; color:var(--text-dark); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f0e8dd';" onmouseout="this.style.background='#faf7f3';">🚜 ¿No me deja guardar postura?</button>
+    </div>
+
+    <!-- Controles de Voz -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; border-top:1px solid rgba(213,164,112,0.1); padding-top:8px;">
+      <button id="dona-ali-speak-btn" onclick="readDonaResponse()" style="background:none; border:none; cursor:pointer; font-size:12px; font-weight:800; color:var(--text-medium);" title="Escuchar respuesta">🔊 Escuchar</button>
+      <button id="dona-ali-listen-btn" onclick="listenToUser()" style="background:none; border:none; cursor:pointer; font-size:12px; font-weight:800; color:#b02500;" title="Hablarle a Doña Ali">🎙️ Hablarle</button>
+    </div>
+  </div>
+
+  <!-- Botón Circular Flotante (Trigger) -->
+  <button onclick="toggleDonaAliBubble()" style="width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, var(--primary), #e07b00); border:none; color:white; font-size:28px; cursor:pointer; box-shadow:0 8px 25px rgba(255,138,0,0.35); display:grid; place-items:center; transition:transform 0.2s ease-in-out;" onmouseover="this.style.transform='scale(1.08)';" onmouseout="this.style.transform='scale(1)';">
+    👵
+  </button>
+</div>
+
+<script>
+  let donaSpeechUtterance = null;
+  let voiceRecognition = null;
+
+  function toggleDonaAliBubble() {
+      const bubble = document.getElementById('dona-ali-bubble');
+      if (bubble.style.display === 'none' || bubble.style.display === '') {
+          bubble.style.display = 'flex';
+          speakText("Hola, granjero. Soy Doña Ali. ¿En qué te ayudo hoy con tus tareas del campo?");
+      } else {
+          bubble.style.display = 'none';
+          if (window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+          }
+      }
+  }
+
+  function askDonaAli(topic) {
+      const textEl = document.getElementById('dona-ali-text');
+      let response = '';
+
+      if (topic === 'postura') {
+          response = 'Para registrar tus huevos recolectados del día, haz clic en el botón naranja que dice "Registrar Postura" en la esquina de arriba. Indica de qué granja provienen, el tipo de huevo, la cantidad y la fecha. El sistema calculará cuántos cartones utilizarás de forma automática.';
+      } else if (topic === 'lotes') {
+          response = 'Cada vez que registras una postura, el sistema crea un Lote de huevos de forma automática. Este lote tiene una etiqueta especial y una fecha de caducidad calculada de 3 días desde su postura para asegurar la frescura de los huevos.';
+      } else if (topic === 'envio') {
+          response = 'Ve a la pestaña "Enviar al CEDIS (Entregas)". Presiona "Solicitar Recolección", elige el centro de distribución de EcoAli al que quieres enviar y la fecha. Luego, marca las casillas de los lotes de tu almacén que vas a mandar e ingresa la cantidad de cada uno.';
+      } else if (topic === 'insumos') {
+          response = 'Para asegurar la calidad, cada postura debe registrarse empacada en cartones. Si tu granja tiene 0 o pocos cartones disponibles, no te dejará guardar. Puedes reabastecer cartones yendo a "Mi Perfil y Granjas" en la sección de tus granjas.';
+      } else {
+          response = 'Hola, hijo. Soy Doña Ali. Estoy aquí para ayudarte a manejar tus registros de postura y tus envíos.';
+      }
+
+      textEl.textContent = response;
+      speakText(response);
+  }
+
+  let selectedFemaleVoice = null;
+  function loadVoices() {
+      if (!window.speechSynthesis) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return;
+      const spanishVoices = voices.filter(v => v.lang.includes('es') || v.lang.includes('ES'));
+      let found = spanishVoices.find(v => {
+          const nameLower = v.name.toLowerCase();
+          return nameLower.includes('sabina') || 
+                 nameLower.includes('dalia') || 
+                 nameLower.includes('yolanda') || 
+                 nameLower.includes('helena') || 
+                 nameLower.includes('laura') || 
+                 nameLower.includes('hilda') || 
+                 nameLower.includes('female') ||
+                 nameLower.includes('zira') ||
+                 nameLower.includes('dona') ||
+                 nameLower.includes('mujer') ||
+                 nameLower.includes('google');
+      });
+      if (!found) {
+          found = spanishVoices.find(v => {
+              const nameLower = v.name.toLowerCase();
+              return !nameLower.includes('david') && 
+                     !nameLower.includes('raul') && 
+                     !nameLower.includes('carlos') && 
+                     !nameLower.includes('jorge') && 
+                     !nameLower.includes('male') && 
+                     !nameLower.includes('hombre');
+          });
+      }
+      if (!found && spanishVoices.length > 0) {
+          found = spanishVoices[0];
+      }
+      selectedFemaleVoice = found;
+  }
+  if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoices();
+  }
+
+  function speakText(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      
+      donaSpeechUtterance = new SpeechSynthesisUtterance(text);
+      donaSpeechUtterance.lang = 'es-MX';
+      
+      if (!selectedFemaleVoice) {
+          loadVoices();
+      }
+      if (selectedFemaleVoice) {
+          donaSpeechUtterance.voice = selectedFemaleVoice;
+      }
+      window.speechSynthesis.speak(donaSpeechUtterance);
+  }
+
+  function readDonaResponse() {
+      const text = document.getElementById('dona-ali-text').textContent;
+      speakText(text);
+  }
+
+  function listenToUser() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+          alert("Tu navegador no soporta el reconocimiento de voz. Te recomiendo usar Google Chrome.");
+          return;
+      }
+
+      const listenBtn = document.getElementById('dona-ali-listen-btn');
+      listenBtn.textContent = "🎙️ Escuchando...";
+      listenBtn.style.color = "var(--secondary)";
+
+      voiceRecognition = new SpeechRecognition();
+      voiceRecognition.lang = 'es-MX';
+      voiceRecognition.interimResults = false;
+      voiceRecognition.maxAlternatives = 1;
+
+      voiceRecognition.start();
+
+      voiceRecognition.onresult = function(event) {
+          const phrase = event.results[0][0].transcript.toLowerCase();
+          console.log("Usuario dijo: " + phrase);
+          
+          if (phrase.includes('postura') || phrase.includes('recolect') || phrase.includes('huevo')) {
+              askDonaAli('postura');
+          } else if (phrase.includes('lote') || phrase.includes('paquete')) {
+              askDonaAli('lotes');
+          } else if (phrase.includes('envio') || phrase.includes('enviar') || phrase.includes('cedis')) {
+              askDonaAli('envio');
+          } else if (phrase.includes('insumo') || phrase.includes('carton') || phrase.includes('no me deja')) {
+              askDonaAli('insumos');
+          } else {
+              const textEl = document.getElementById('dona-ali-text');
+              textEl.textContent = 'Te escuché: "' + phrase + '". ¿Me puedes preguntar de otra forma, por favor?';
+              speakText(textEl.textContent);
+          }
+      };
+
+      voiceRecognition.onspeechend = function() {
+          listenBtn.textContent = "🎙️ Hablarle";
+          listenBtn.style.color = "#b02500";
+          voiceRecognition.stop();
+      };
+
+      voiceRecognition.onerror = function(event) {
+          listenBtn.textContent = "🎙️ Hablarle";
+          listenBtn.style.color = "#b02500";
+          console.log("Error de reconocimiento: " + event.error);
+      };
+  }
+</script>
 
 </body>
 </html>
