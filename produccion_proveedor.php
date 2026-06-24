@@ -38,14 +38,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if ($accion === "agregar") {
         $granja_id = (int)($_POST["granja_id"] ?? 0);
-        $producto_id = (int)($_POST["producto_id"] ?? 0);
-        $cantidad = (int)($_POST["cantidad"] ?? 0);
-        $no_viable = max(0, (int)($_POST["no_viable"] ?? 0));
-        $merma = max(0, (int)($_POST["merma"] ?? 0));
         $fecha_produccion = trim($_POST["fecha_produccion"] ?? "");
         $observaciones = trim($_POST["observaciones"] ?? "");
+        $productos_post = $_POST["productos"] ?? [];
 
-        if ($granja_id <= 0 || $producto_id <= 0 || $cantidad <= 0 || empty($fecha_produccion)) {
+        if ($granja_id <= 0 || empty($fecha_produccion)) {
             $mensaje_error = "Todos los campos obligatorios deben completarse correctamente.";
         } else {
             // Validar propiedad de la granja y stock de cartones
@@ -60,45 +57,85 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $granja_nombre = $granja_data["nombre"];
                 $stock_cartones = (int)$granja_data["stock_cartones"];
 
-                // 1 cartón = 30 huevos
-                $cartones_necesarios = (int)ceil($cantidad / 30);
-                if ($stock_cartones < $cartones_necesarios) {
-                    $mensaje_error = "Insumos insuficientes: La granja '$granja_nombre' requiere $cartones_necesarios cartones de empaque para $cantidad huevos, pero solo cuenta con $stock_cartones disponibles.";
+                // Procesar y validar productos enviados
+                $productos_validos = [];
+                $cartones_totales_necesarios = 0;
+
+                foreach ($productos_post as $p_id => $data) {
+                    $p_id = (int)$p_id;
+                    $total_rec = (int)($data["total"] ?? 0);
+                    $no_viable = max(0, (int)($data["no_viable"] ?? 0));
+                    $merma = max(0, (int)($data["merma"] ?? 0));
+
+                    // Solo procesamos si el total recolectado es mayor a 0
+                    if ($total_rec > 0) {
+                        $cant_calculada = max(0, $total_rec - $no_viable - $merma);
+                        if ($cant_calculada > 0) {
+                            $cartones_prod = (int)ceil($cant_calculada / 30);
+                            $cartones_totales_necesarios += $cartones_prod;
+                            $productos_validos[] = [
+                                "producto_id" => $p_id,
+                                "cantidad" => $cant_calculada,
+                                "no_viable" => $no_viable,
+                                "merma" => $merma,
+                                "cartones" => $cartones_prod
+                            ];
+                        }
+                    }
+                }
+
+                if (empty($productos_validos)) {
+                    $mensaje_error = "Debe registrar al menos un tipo de huevo con cantidad viable mayor a 0.";
+                } elseif ($stock_cartones < $cartones_totales_necesarios) {
+                    $mensaje_error = "Insumos insuficientes: La granja '$granja_nombre' requiere $cartones_totales_necesarios cartones de empaque para los huevos registrados, pero solo cuenta con $stock_cartones disponibles.";
                 } else {
                     // Iniciar transacción
                     $conn->begin_transaction();
                     try {
                         // Descontar cartones de la granja
-                        $nuevo_stock = $stock_cartones - $cartones_necesarios;
+                        $nuevo_stock = $stock_cartones - $cartones_totales_necesarios;
                         $stmtUpG = $conn->prepare("UPDATE granjas SET stock_cartones = ? WHERE id = ?");
                         $stmtUpG->bind_param("ii", $nuevo_stock, $granja_id);
                         $stmtUpG->execute();
                         $stmtUpG->close();
 
-                        // Generar código de lote único
-                        $lote_hash = strtoupper(substr(md5(time() . rand(1, 100)), 0, 4));
-                        $codigo_lote = "LOTE-P" . $producto_id . "-U" . $usuario_id . "-" . $lote_hash;
+                        $lotes_creados = [];
 
-                        // Fecha de caducidad = postura + 3 días
-                        $fecha_caducidad = date('Y-m-d', strtotime('+3 days', strtotime($fecha_produccion)));
+                        // Insertar para cada producto
+                        foreach ($productos_validos as $pv) {
+                            $prod_id = $pv["producto_id"];
+                            $cant = $pv["cantidad"];
+                            $no_viable = $pv["no_viable"];
+                            $merma = $pv["merma"];
 
-                        // Insertar en produccion
-                        $stmtInsP = $conn->prepare("INSERT INTO produccion (proveedor_id, producto_id, granja_id, cantidad, no_viable, merma, fecha_produccion, observaciones, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                        $stmtInsP->bind_param("iiiiiisss", $proveedor_id, $producto_id, $granja_id, $cantidad, $no_viable, $merma, $fecha_produccion, $observaciones, $codigo_lote);
-                        $stmtInsP->execute();
-                        $stmtInsP->close();
+                            // Generar código de lote único
+                            $lote_hash = strtoupper(substr(md5(time() . rand(1, 100) . $prod_id), 0, 4));
+                            $codigo_lote = "LOTE-P" . $prod_id . "-U" . $usuario_id . "-" . $lote_hash;
 
-                        // Insertar en inventario_huevos (lote)
-                        $stmtInsI = $conn->prepare("INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, no_viable, merma, fecha_postura, fecha_caducidad, estado, granja_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
-                        $stmtInsI->bind_param("iisiiiissi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $granja_id);
-                        $stmtInsI->execute();
-                        $stmtInsI->close();
+                            // Fecha de caducidad = postura + 3 días
+                            $fecha_caducidad = date('Y-m-d', strtotime('+3 days', strtotime($fecha_produccion)));
+
+                            // Insertar en produccion
+                            $stmtInsP = $conn->prepare("INSERT INTO produccion (proveedor_id, producto_id, granja_id, cantidad, no_viable, merma, fecha_produccion, observaciones, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                            $stmtInsP->bind_param("iiiiiisss", $proveedor_id, $prod_id, $granja_id, $cant, $no_viable, $merma, $fecha_produccion, $observaciones, $codigo_lote);
+                            $stmtInsP->execute();
+                            $stmtInsP->close();
+
+                            // Insertar en inventario_huevos (lote)
+                            $stmtInsI = $conn->prepare("INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, no_viable, merma, fecha_postura, fecha_caducidad, estado, granja_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
+                            $stmtInsI->bind_param("iisiiiissi", $proveedor_id, $prod_id, $codigo_lote, $cant, $cant, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $granja_id);
+                            $stmtInsI->execute();
+                            $stmtInsI->close();
+
+                            $lotes_creados[] = $codigo_lote;
+                        }
 
                         // Registrar auditoría
-                        registrar_bitacora("Producción registrada", "Inventario", "El proveedor registró postura de $cantidad huevos viables ($no_viable no viables, $merma mermas) en la granja '$granja_nombre' generando el lote $codigo_lote.");
+                        $lotes_str = implode(", ", $lotes_creados);
+                        registrar_bitacora("Producción registrada", "Inventario", "El proveedor registró postura múltiple en la granja '$granja_nombre' generando los lotes: $lotes_str.");
 
                         $conn->commit();
-                        $mensaje_exito = "¡Producción y Lote $codigo_lote registrados correctamente!";
+                        $mensaje_exito = "¡Producción y Lotes (" . $lotes_str . ") registrados correctamente!";
                     } catch (Exception $e) {
                         $conn->rollback();
                         $mensaje_error = "Error en base de datos: " . $e->getMessage();
@@ -545,7 +582,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
       <form action="produccion_proveedor.php" method="POST">
         <input type="hidden" name="accion" value="agregar">
         
-        <div class="form-grid" style="grid-template-columns: 1fr;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
           <div class="form-group">
             <label>Granja de Origen *</label>
             <select name="granja_id" required>
@@ -556,56 +593,63 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </select>
           </div>
 
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label>Tipo de Huevo *</label>
-              <select name="producto_id" required>
-                <option value="">-- Selecciona --</option>
-                <?php foreach ($productos as $p): 
-                  if ($p['id'] == 2) continue; // Quitar Grande Tradicional
-                  
-                  $displayLabel = "";
-                  if (strpos(strtolower($p['tamano']), 'chico') !== false) {
-                      $displayLabel = "Chico";
-                  } elseif (strpos(strtolower($p['tamano']), 'mediano') !== false) {
-                      $displayLabel = "Mediano";
-                  } else {
-                      $displayLabel = "Grande";
-                  }
-                ?>
-                  <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($displayLabel); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+          <div class="form-group">
+            <label>Fecha de Postura *</label>
+            <input type="date" name="fecha_produccion" value="<?php echo date('Y-m-d'); ?>" required>
+          </div>
+        </div>
 
-            <div class="form-group">
-              <label>Total Huevos Recolectados *</label>
-              <input type="number" id="add_total_recolectado" min="1" placeholder="Ej: 100" oninput="calculateViablesAdd()" required>
+        <div style="margin: 10px 0 16px 0; border-bottom: 2px solid var(--primary); padding-bottom: 6px;">
+          <h4 style="color: var(--text-dark); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 800;">Detalle de Postura por Tamaño</h4>
+        </div>
+
+        <?php foreach ($productos as $p): 
+          if ($p['id'] == 2) continue; // Quitar Grande Tradicional
+          
+          $displayLabel = "";
+          if (strpos(strtolower($p['tamano']), 'chico') !== false) {
+              $displayLabel = "Chico";
+          } elseif (strpos(strtolower($p['tamano']), 'mediano') !== false) {
+              $displayLabel = "Mediano";
+          } else {
+              $displayLabel = "Grande";
+          }
+          
+          $prodId = $p['id'];
+        ?>
+          <div class="size-section-row" style="background: rgba(255, 138, 0, 0.02); border: 1.5px solid var(--glass-border); padding: 16px; border-radius: 18px; margin-bottom: 16px;">
+            <h5 style="color: var(--secondary); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>🥚</span> Huevo <?php echo htmlspecialchars($displayLabel); ?>
+            </h5>
+            
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label>Total Recolectados</label>
+                <input type="number" name="productos[<?php echo $prodId; ?>][total]" id="add_total_<?php echo $prodId; ?>" min="0" placeholder="Ej: 100" oninput="calculateViablesAdd()">
+              </div>
+              <div class="form-group">
+                <label>No Viables (Pigmentados)</label>
+                <input type="number" name="productos[<?php echo $prodId; ?>][no_viable]" id="add_no_viable_<?php echo $prodId; ?>" min="0" value="0" placeholder="Ej: 10" oninput="calculateViablesAdd()">
+              </div>
+            </div>
+            
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label>Mermas (Rotos / Dañados)</label>
+                <input type="number" name="productos[<?php echo $prodId; ?>][merma]" id="add_merma_<?php echo $prodId; ?>" min="0" value="0" placeholder="Ej: 5" oninput="calculateViablesAdd()">
+              </div>
+              <div class="form-group">
+                <label>Viables / Aptos (Uds)</label>
+                <input type="number" name="productos[<?php echo $prodId; ?>][cantidad]" id="add_cantidad_<?php echo $prodId; ?>" min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Autocalculado" value="0">
+              </div>
             </div>
           </div>
+        <?php endforeach; ?>
 
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label>No Viables (Pigmentación Irregular)</label>
-              <input type="number" name="no_viable" id="add_no_viable" min="0" value="0" placeholder="Ej: 10" oninput="calculateViablesAdd()">
-            </div>
-
-            <div class="form-group">
-              <label>Mermas (Rotos / Dañados)</label>
-              <input type="number" name="merma" id="add_merma" min="0" value="0" placeholder="Ej: 5" oninput="calculateViablesAdd()">
-            </div>
-          </div>
-
-          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label>Huevos Viables / Aptos (Uds) *</label>
-              <input type="number" name="cantidad" id="add_cantidad" min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Se calcula automáticamente" required>
-              <div style="font-size:12px; color:var(--secondary); font-weight:800; margin-top:4px;" id="calc_cartones">Se usarán aproximadamente 0 cartones de empaque.</div>
-            </div>
-
-            <div class="form-group">
-              <label>Fecha de Postura *</label>
-              <input type="date" name="fecha_produccion" value="<?php echo date('Y-m-d'); ?>" required>
+        <div class="form-grid" style="grid-template-columns: 1fr; gap: 12px; margin-top: 10px;">
+          <div class="form-group">
+            <div style="font-size:13px; color:var(--secondary); font-weight:800; padding: 10px 14px; background: rgba(23, 106, 33, 0.06); border-radius: 12px; border: 1px dashed var(--secondary);" id="calc_cartones">
+              Se usarán aproximadamente 0 cartones de empaque en total.
             </div>
           </div>
 
@@ -617,7 +661,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <div class="modal-actions">
           <button type="button" class="btn-cancel" onclick="cerrarModal('modalCrear')">Cancelar</button>
-          <button type="submit" class="btn-submit">Registrar Postura y Lote</button>
+          <button type="submit" class="btn-submit">Registrar Postura y Lotes</button>
         </div>
       </form>
     <?php endif; ?>
@@ -738,31 +782,59 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <!-- Scripts de paginación e interactividad -->
 <script>
 function abrirModalCrear() {
-    document.getElementById('add_total_recolectado').value = '';
-    document.getElementById('add_no_viable').value = 0;
-    document.getElementById('add_merma').value = 0;
-    document.getElementById('add_cantidad').value = 0;
-    updateCartonCalc(0, 'calc_cartones');
+    const totalInputs = document.querySelectorAll('[id^="add_total_"]');
+    totalInputs.forEach(totalInput => {
+        const idParts = totalInput.id.split('_');
+        const prodId = idParts[idParts.length - 1];
+        
+        totalInput.value = '';
+        document.getElementById('add_no_viable_' + prodId).value = 0;
+        document.getElementById('add_merma_' + prodId).value = 0;
+        document.getElementById('add_cantidad_' + prodId).value = 0;
+    });
+    
+    const calcText = document.getElementById('calc_cartones');
+    if (calcText) {
+        calcText.textContent = 'Se usarán aproximadamente 0 cartones de empaque en total.';
+    }
+    
     document.getElementById('modalCrear').classList.add('active');
 }
 
 function calculateViablesAdd() {
-    const totalInput = document.getElementById('add_total_recolectado');
-    const noViableInput = document.getElementById('add_no_viable');
-    const mermaInput = document.getElementById('add_merma');
-    const cantidadInput = document.getElementById('add_cantidad');
+    let totalCartones = 0;
+    let totalViablesGral = 0;
     
-    if (!totalInput || !cantidadInput) return;
+    const totalInputs = document.querySelectorAll('[id^="add_total_"]');
+    totalInputs.forEach(totalInput => {
+        const idParts = totalInput.id.split('_');
+        const prodId = idParts[idParts.length - 1];
+        
+        const noViableInput = document.getElementById('add_no_viable_' + prodId);
+        const mermaInput = document.getElementById('add_merma_' + prodId);
+        const cantidadInput = document.getElementById('add_cantidad_' + prodId);
+        
+        if (noViableInput && mermaInput && cantidadInput) {
+            const total = parseInt(totalInput.value) || 0;
+            const noViable = parseInt(noViableInput.value) || 0;
+            const merma = parseInt(mermaInput.value) || 0;
+            
+            let viables = total - noViable - merma;
+            if (viables < 0) viables = 0;
+            
+            cantidadInput.value = viables;
+            
+            if (viables > 0) {
+                totalCartones += Math.ceil(viables / 30);
+                totalViablesGral += viables;
+            }
+        }
+    });
     
-    const total = parseInt(totalInput.value) || 0;
-    const noViable = parseInt(noViableInput.value) || 0;
-    const merma = parseInt(mermaInput.value) || 0;
-    
-    let viables = total - noViable - merma;
-    if (viables < 0) viables = 0;
-    
-    cantidadInput.value = viables;
-    updateCartonCalc(viables, 'calc_cartones');
+    const calcText = document.getElementById('calc_cartones');
+    if (calcText) {
+        calcText.textContent = 'Se usarán aproximadamente ' + totalCartones + ' cartones de empaque en total.';
+    }
 }
 
 function calculateViablesEdit() {
