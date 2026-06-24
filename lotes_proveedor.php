@@ -226,6 +226,15 @@ $resP = $conn->query("SELECT id, nombre, tamano FROM productos WHERE activo = 1 
 while ($row = $resP->fetch_assoc()) {
     $productos[] = $row;
 }
+usort($productos, function($a, $b) {
+    $getWeight = function($p) {
+        $tamano = strtolower($p['tamano']);
+        if (strpos($tamano, 'chico') !== false) return 1;
+        if (strpos($tamano, 'mediano') !== false) return 2;
+        return 3;
+    };
+    return $getWeight($a) - $getWeight($b);
+});
 
 // Historial de lotes con entregas e info relacionada
 $lotesList = [];
@@ -469,8 +478,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
           <div class="form-group">
             <label>Tipo de Huevo *</label>
             <select name="producto_id" id="edit_producto_id" required>
-              <?php foreach ($productos as $p): ?>
-                <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($p["nombre"] . " (" . $p["tamano"] . ")"); ?></option>
+              <?php foreach ($productos as $p): 
+                if ($p['id'] == 2) continue; // Quitar Grande Tradicional
+                
+                $displayLabel = "";
+                if (strpos(strtolower($p['tamano']), 'chico') !== false) {
+                    $displayLabel = "Chico";
+                } elseif (strpos(strtolower($p['tamano']), 'mediano') !== false) {
+                    $displayLabel = "Mediano";
+                } else {
+                    $displayLabel = "Grande";
+                }
+              ?>
+                <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($displayLabel); ?></option>
               <?php endforeach; ?>
             </select>
           </div>

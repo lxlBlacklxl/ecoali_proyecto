@@ -25,10 +25,10 @@ $prodCountRes = $conn->query("SELECT COUNT(*) FROM productos");
 $prodCount = $prodCountRes ? $prodCountRes->fetch_row()[0] : 0;
 if ($prodCount == 0) {
     $conn->query("INSERT INTO productos (nombre, tipo_huevo, tamano, precio, activo) VALUES 
-        ('Orgánico Camperos Extra', 'Orgánico Camperos', 'Extra (XL)', 4.50, 1),
-        ('Blanco Tradicional Grande', 'Blanco Tradicional', 'Grande (L)', 3.20, 1),
-        ('Ponedora Rubia Medio', 'Ponedora Rubia', 'Medio (M)', 2.80, 1),
-        ('Ecológico de Pasto Chico', 'Ecológico de Pasto', 'Pequeño (S)', 5.00, 1)
+        ('Orgánico Camperos Jumbo', 'Orgánico Camperos', 'Jumbo (Más de 70g)', 4.50, 1),
+        ('Blanco Tradicional Jumbo', 'Blanco Tradicional', 'Jumbo (Más de 70g)', 3.20, 1),
+        ('Ponedora Rubia Mediano', 'Ponedora Rubia', 'Mediano (56g a 70g)', 2.80, 1),
+        ('Ecológico de Pasto Chico', 'Ecológico de Pasto', 'Chico (Menos de 56g)', 5.00, 1)
     ");
 }
 
@@ -51,11 +51,14 @@ $caducadosStock = $caducadosRes ? $caducadosRes->fetch_row()[0] : 0;
 $proveedoresSelect = $conn->query("SELECT id, nombre_empresa FROM proveedores WHERE estado = 'activo' ORDER BY nombre_empresa ASC");
 $productosSelect = $conn->query("SELECT id, tipo_huevo, tamano FROM productos WHERE activo = 1 ORDER BY tipo_huevo ASC");
 
-// Obtener la lista dinámica de lotes del inventario
-$sqlLotes = "SELECT ih.*, p.nombre_empresa, pr.tipo_huevo, pr.tamano 
+// Obtener la lista dinámica de lotes del inventario con su control de calidad de postura
+$sqlLotes = "SELECT ih.*, p.nombre_empresa, pr.tipo_huevo, pr.tamano,
+                    GREATEST(ih.no_viable, COALESCE(prod.no_viable, 0)) AS no_viable,
+                    GREATEST(ih.merma, COALESCE(prod.merma, 0)) AS merma
              FROM inventario_huevos ih 
              LEFT JOIN proveedores p ON ih.proveedor_id = p.id 
              LEFT JOIN productos pr ON ih.producto_id = pr.id 
+             LEFT JOIN produccion prod ON ih.codigo_lote = prod.codigo_lote
              ORDER BY ih.id DESC";
 $resultLotes = $conn->query($sqlLotes);
 $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
@@ -250,19 +253,28 @@ $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
                   'tipo' => $row['tipo_huevo'] ?? 'N/A',
                   'tamano' => $row['tamano'] ?? 'M',
                   'cantidad' => $row['cantidad'],
+                  'no_viable' => (int)($row['no_viable'] ?? 0),
+                  'merma' => (int)($row['merma'] ?? 0),
+                  'total_cosechado' => (int)($row['cantidad'] + ($row['no_viable'] ?? 0) + ($row['merma'] ?? 0)),
                   'postura' => $row['fecha_postura'] ? date("d/m/Y", strtotime($row['fecha_postura'])) : 'N/A',
                   'caducidad' => $row['fecha_caducidad'] ? date("d/m/Y", strtotime($row['fecha_caducidad'])) : 'N/A',
                   'estado' => $estadoText
               ]);
           ?>
-          <div class="div-3 row-lote" data-estado="<?php echo $estado; ?>" style="grid-template-columns: 1.1fr 1.6fr 1.6fr 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.8fr; border-bottom: 1px solid rgba(213,164,112,.12);">
+          <div class="div-3 row-lote" data-estado="<?php echo $estado; ?>" style="grid-template-columns: 1.1fr 1.6fr 1.6fr 1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.8fr; border-bottom: 1px solid rgba(213,164,112,.12); height: auto; padding: 12px 0;">
             <div><div class="text-10"><?php echo htmlspecialchars($row["codigo_lote"]); ?></div></div>
             <div><div class="text-11" style="font-weight: 700;"><?php echo htmlspecialchars($row["nombre_empresa"] ?? "Granja Local"); ?></div></div>
             <div><div class="text-11"><?php echo htmlspecialchars($row["tipo_huevo"] ?? "No especificado"); ?></div></div>
             <div><div class="text-12"><?php echo htmlspecialchars($row["tamano"] ?? "-"); ?></div></div>
             <div>
-              <div class="background-2">
-                <div class="text-13"><?php echo $row["cantidad"]; ?> ud.</div>
+              <div class="background-2" style="height: auto; padding: 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 8px;">
+                <div class="text-13" style="font-weight: 800;"><?php echo $row["cantidad"]; ?> ud.</div>
+                <?php if ((int)$row["no_viable"] > 0): ?>
+                  <span style="font-size: 10px; color: #ff8a00; font-weight: 800; background: rgba(255, 138, 0, 0.08); padding: 2px 6px; border-radius: 4px; display: inline-block;">🎨 <?php echo $row["no_viable"]; ?></span>
+                <?php endif; ?>
+                <?php if ((int)$row["merma"] > 0): ?>
+                  <span style="font-size: 10px; color: #b02500; font-weight: 800; background: rgba(176, 37, 0, 0.08); padding: 2px 6px; border-radius: 4px; display: inline-block;">🩹 <?php echo $row["merma"]; ?></span>
+                <?php endif; ?>
               </div>
             </div>
             <div><div class="text-14"><?php echo $row["fecha_postura"] ? date("d M Y", strtotime($row["fecha_postura"])) : "-"; ?></div></div>
@@ -363,8 +375,23 @@ $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
       </div>
 
       <div class="form-group">
-        <label class="form-label">Cantidad (Unidades) *</label>
-        <input type="number" name="cantidad" class="form-input" required min="0" placeholder="Ej. 450">
+        <label class="form-label">Total Huevos Recolectados *</label>
+        <input type="number" id="add_total_recolectado" class="form-input" required min="0" placeholder="Ej. 100" oninput="calculateViablesAdd()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">No Viables (Pigmentación Irregular)</label>
+        <input type="number" name="no_viable" id="add_no_viable" class="form-input" min="0" value="0" placeholder="Ej. 10" oninput="calculateViablesAdd()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Mermas (Rotos / Dañados)</label>
+        <input type="number" name="merma" id="add_merma" class="form-input" min="0" value="0" placeholder="Ej. 5" oninput="calculateViablesAdd()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cantidad Viables / Aptos (Uds) *</label>
+        <input type="number" name="cantidad" id="add_cantidad" class="form-input" required min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Se calcula automáticamente">
       </div>
 
       <div class="form-group">
@@ -434,8 +461,23 @@ $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
       </div>
 
       <div class="form-group">
-        <label class="form-label">Cantidad (Unidades) *</label>
-        <input type="number" name="cantidad" id="edit_cantidad" class="form-input" required min="0">
+        <label class="form-label">Total Huevos Recolectados *</label>
+        <input type="number" id="edit_total_recolectado" class="form-input" required min="0" placeholder="Ej. 100" oninput="calculateViablesEdit()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">No Viables (Pigmentación Irregular)</label>
+        <input type="number" name="no_viable" id="edit_no_viable" class="form-input" min="0" value="0" oninput="calculateViablesEdit()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Mermas (Rotos / Dañados)</label>
+        <input type="number" name="merma" id="edit_merma" class="form-input" min="0" value="0" oninput="calculateViablesEdit()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cantidad Viables / Aptos (Uds) *</label>
+        <input type="number" name="cantidad" id="edit_cantidad" class="form-input" required min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Se calcula automáticamente">
       </div>
 
       <div class="form-group">
@@ -505,8 +547,14 @@ $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
       </div>
       
       <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Tipo de Huevo:</strong> <span id="traza_tipo"></span></p>
-      <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Tamaño de Presentación:</strong> <span id="traza_tamano"></span></p>
-      <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Cantidad Disponible:</strong> <span id="traza_cantidad" style="font-weight: 700;"></span> ud.</p>
+      <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Tamaño de Presentación:</strong> <span id="traza_tamano" style="font-weight: 700; color:#176a21;"></span></p>
+      
+      <div style="background: rgba(23, 106, 33, 0.03); border-radius: 8px; padding: 10px 14px; margin: 8px 0; border: 1px solid rgba(23, 106, 33, 0.08);">
+        <p style="margin: 4px 0;"><strong>Cantidad Disponible (Venta):</strong> <span id="traza_cantidad" style="font-weight: 800; color:#176a21;"></span> ud.</p>
+        <p style="margin: 4px 0; font-size: 13px;"><strong>No Viables (Pigmentación):</strong> <span id="traza_no_viable" style="font-weight: 700; color:#ff8a00;"></span> ud.</p>
+        <p style="margin: 4px 0; font-size: 13px;"><strong>Mermas (Rotos / Dañados):</strong> <span id="traza_merma" style="font-weight: 700; color:#b02500;"></span> ud.</p>
+        <p style="margin: 4px 0; border-top: 1px solid rgba(213,164,112,0.15); padding-top: 4px; font-weight: bold;"><strong>Total Cosechado Bruto:</strong> <span id="traza_total_cosechado"></span> ud.</p>
+      </div>
       <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Fecha de Postura:</strong> <span id="traza_postura"></span></p>
       <p style="margin: 6px 0; border-bottom: 1px solid rgba(213,164,112,.08); padding-bottom: 4px;"><strong>Fecha de Vencimiento:</strong> <span id="traza_caducidad"></span></p>
       <p style="margin: 6px 0;"><strong>Estado de Almacén:</strong> <span id="traza_estado" style="font-weight:700;"></span></p>
@@ -545,7 +593,47 @@ $countLotes = $resultLotes ? $resultLotes->num_rows : 0;
      SCRIPTS DE CONTROL INTERACTIVO
      ========================================== -->
 <script>
+function calculateViablesAdd() {
+    const totalInput = document.getElementById('add_total_recolectado');
+    const noViableInput = document.getElementById('add_no_viable');
+    const mermaInput = document.getElementById('add_merma');
+    const cantidadInput = document.getElementById('add_cantidad');
+    
+    if (!totalInput || !cantidadInput) return;
+    
+    const total = parseInt(totalInput.value) || 0;
+    const noViable = parseInt(noViableInput.value) || 0;
+    const merma = parseInt(mermaInput.value) || 0;
+    
+    let viables = total - noViable - merma;
+    if (viables < 0) viables = 0;
+    
+    cantidadInput.value = viables;
+}
+
+function calculateViablesEdit() {
+    const totalInput = document.getElementById('edit_total_recolectado');
+    const noViableInput = document.getElementById('edit_no_viable');
+    const mermaInput = document.getElementById('edit_merma');
+    const cantidadInput = document.getElementById('edit_cantidad');
+    
+    if (!totalInput || !cantidadInput) return;
+    
+    const total = parseInt(totalInput.value) || 0;
+    const noViable = parseInt(noViableInput.value) || 0;
+    const merma = parseInt(mermaInput.value) || 0;
+    
+    let viables = total - noViable - merma;
+    if (viables < 0) viables = 0;
+    
+    cantidadInput.value = viables;
+}
+
 function abrirModalCrear() {
+    document.getElementById('add_total_recolectado').value = '';
+    document.getElementById('add_no_viable').value = 0;
+    document.getElementById('add_merma').value = 0;
+    document.getElementById('add_cantidad').value = 0;
     document.getElementById('modalCrear').classList.add('active');
 }
 
@@ -558,7 +646,16 @@ function abrirModalEditar(id) {
                 document.getElementById('edit_proveedor_id').value = res.data.proveedor_id;
                 document.getElementById('edit_producto_id').value = res.data.producto_id;
                 document.getElementById('edit_codigo_lote').value = res.data.codigo_lote;
-                document.getElementById('edit_cantidad').value = res.data.cantidad;
+                
+                const cantidad = parseInt(res.data.cantidad) || 0;
+                const noViable = parseInt(res.data.no_viable) || 0;
+                const merma = parseInt(res.data.merma) || 0;
+                
+                document.getElementById('edit_cantidad').value = cantidad;
+                document.getElementById('edit_no_viable').value = noViable;
+                document.getElementById('edit_merma').value = merma;
+                document.getElementById('edit_total_recolectado').value = cantidad + noViable + merma;
+                
                 document.getElementById('edit_fecha_postura').value = res.data.fecha_postura || '';
                 document.getElementById('edit_fecha_caducidad').value = res.data.fecha_caducidad || '';
                 document.getElementById('edit_estado').value = res.data.estado;
@@ -585,6 +682,9 @@ function mostrarTrazabilidad(data) {
     document.getElementById('traza_tipo').textContent = data.tipo;
     document.getElementById('traza_tamano').textContent = data.tamano;
     document.getElementById('traza_cantidad').textContent = data.cantidad;
+    document.getElementById('traza_no_viable').textContent = data.no_viable;
+    document.getElementById('traza_merma').textContent = data.merma;
+    document.getElementById('traza_total_cosechado').textContent = data.total_cosechado;
     document.getElementById('traza_postura').textContent = data.postura;
     document.getElementById('traza_caducidad').textContent = data.caducidad;
     document.getElementById('traza_estado').textContent = data.estado;

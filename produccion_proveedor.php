@@ -40,6 +40,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $granja_id = (int)($_POST["granja_id"] ?? 0);
         $producto_id = (int)($_POST["producto_id"] ?? 0);
         $cantidad = (int)($_POST["cantidad"] ?? 0);
+        $no_viable = max(0, (int)($_POST["no_viable"] ?? 0));
+        $merma = max(0, (int)($_POST["merma"] ?? 0));
         $fecha_produccion = trim($_POST["fecha_produccion"] ?? "");
         $observaciones = trim($_POST["observaciones"] ?? "");
 
@@ -81,19 +83,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $fecha_caducidad = date('Y-m-d', strtotime('+3 days', strtotime($fecha_produccion)));
 
                         // Insertar en produccion
-                        $stmtInsP = $conn->prepare("INSERT INTO produccion (proveedor_id, producto_id, granja_id, cantidad, fecha_produccion, observaciones, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                        $stmtInsP->bind_param("iiiisss", $proveedor_id, $producto_id, $granja_id, $cantidad, $fecha_produccion, $observaciones, $codigo_lote);
+                        $stmtInsP = $conn->prepare("INSERT INTO produccion (proveedor_id, producto_id, granja_id, cantidad, no_viable, merma, fecha_produccion, observaciones, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmtInsP->bind_param("iiiiiisss", $proveedor_id, $producto_id, $granja_id, $cantidad, $no_viable, $merma, $fecha_produccion, $observaciones, $codigo_lote);
                         $stmtInsP->execute();
                         $stmtInsP->close();
 
                         // Insertar en inventario_huevos (lote)
-                        $stmtInsI = $conn->prepare("INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, fecha_postura, fecha_caducidad, estado, granja_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
-                        $stmtInsI->bind_param("iisiisssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id);
+                        $stmtInsI = $conn->prepare("INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, no_viable, merma, fecha_postura, fecha_caducidad, estado, granja_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)");
+                        $stmtInsI->bind_param("iisiiiissi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $granja_id);
                         $stmtInsI->execute();
                         $stmtInsI->close();
 
                         // Registrar auditoría
-                        registrar_bitacora("Producción registrada", "Inventario", "El proveedor registró postura de $cantidad huevos en la granja '$granja_nombre' generando el lote $codigo_lote.");
+                        registrar_bitacora("Producción registrada", "Inventario", "El proveedor registró postura de $cantidad huevos viables ($no_viable no viables, $merma mermas) en la granja '$granja_nombre' generando el lote $codigo_lote.");
 
                         $conn->commit();
                         $mensaje_exito = "¡Producción y Lote $codigo_lote registrados correctamente!";
@@ -110,6 +112,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $granja_id = (int)($_POST["granja_id"] ?? 0);
         $producto_id = (int)($_POST["producto_id"] ?? 0);
         $cantidad = (int)($_POST["cantidad"] ?? 0);
+        $no_viable = max(0, (int)($_POST["no_viable"] ?? 0));
+        $merma = max(0, (int)($_POST["merma"] ?? 0));
         $fecha_produccion = trim($_POST["fecha_produccion"] ?? "");
         $observaciones = trim($_POST["observaciones"] ?? "");
 
@@ -171,17 +175,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     // Actualizar produccion e inventario
                                     $fecha_caducidad = date('Y-m-d', strtotime('+3 days', strtotime($fecha_produccion)));
                                     
-                                    $stmtUpP = $conn->prepare("UPDATE produccion SET producto_id = ?, granja_id = ?, cantidad = ?, fecha_produccion = ?, observaciones = ? WHERE id = ?");
-                                    $stmtUpP->bind_param("iiissi", $producto_id, $granja_id, $cantidad, $fecha_produccion, $observaciones, $id);
+                                    $stmtUpP = $conn->prepare("UPDATE produccion SET producto_id = ?, granja_id = ?, cantidad = ?, no_viable = ?, merma = ?, fecha_produccion = ?, observaciones = ? WHERE id = ?");
+                                    $stmtUpP->bind_param("iiiiissi", $producto_id, $granja_id, $cantidad, $no_viable, $merma, $fecha_produccion, $observaciones, $id);
                                     $stmtUpP->execute();
                                     $stmtUpP->close();
 
-                                    $stmtUpI = $conn->prepare("UPDATE inventario_huevos SET producto_id = ?, cantidad_inicial = ?, cantidad = ?, fecha_postura = ?, fecha_caducidad = ?, granja_id = ? WHERE codigo_lote = ?");
-                                    $stmtUpI->bind_param("iiissis", $producto_id, $cantidad, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id, $codigo_lote);
+                                    $stmtUpI = $conn->prepare("UPDATE inventario_huevos SET producto_id = ?, cantidad_inicial = ?, cantidad = ?, no_viable = ?, merma = ?, fecha_postura = ?, fecha_caducidad = ?, granja_id = ? WHERE codigo_lote = ?");
+                                    $stmtUpI->bind_param("iiiiisisi", $producto_id, $cantidad, $cantidad, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $granja_id, $codigo_lote);
                                     $stmtUpI->execute();
                                     $stmtUpI->close();
 
-                                    registrar_bitacora("Producción editada", "Inventario", "El proveedor editó el registro de producción del lote '$codigo_lote'. Nueva cantidad: $cantidad.");
+                                    registrar_bitacora("Producción editada", "Inventario", "El proveedor editó el registro de producción del lote '$codigo_lote'. Nueva cantidad viables: $cantidad, no viables: $no_viable, mermas: $merma.");
                                     $conn->commit();
                                     $mensaje_exito = "¡La producción se actualizó correctamente!";
                                 } catch (Exception $e) {
@@ -202,17 +206,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     
                                     $fecha_caducidad = date('Y-m-d', strtotime('+3 days', strtotime($fecha_produccion)));
                                     
-                                    $stmtUpP = $conn->prepare("UPDATE produccion SET producto_id = ?, cantidad = ?, fecha_produccion = ?, observaciones = ? WHERE id = ?");
-                                    $stmtUpP->bind_param("iissi", $producto_id, $cantidad, $fecha_produccion, $observaciones, $id);
+                                    $stmtUpP = $conn->prepare("UPDATE produccion SET producto_id = ?, cantidad = ?, no_viable = ?, merma = ?, fecha_produccion = ?, observaciones = ? WHERE id = ?");
+                                    $stmtUpP->bind_param("iiiiissi", $producto_id, $cantidad, $no_viable, $merma, $fecha_produccion, $observaciones, $id);
                                     $stmtUpP->execute();
                                     $stmtUpP->close();
 
-                                    $stmtUpI = $conn->prepare("UPDATE inventario_huevos SET producto_id = ?, cantidad_inicial = ?, cantidad = ?, fecha_postura = ?, fecha_caducidad = ? WHERE codigo_lote = ?");
-                                    $stmtUpI->bind_param("iiisss", $producto_id, $cantidad, $cantidad, $fecha_produccion, $fecha_caducidad, $codigo_lote);
+                                    $stmtUpI = $conn->prepare("UPDATE inventario_huevos SET producto_id = ?, cantidad_inicial = ?, cantidad = ?, no_viable = ?, merma = ?, fecha_postura = ?, fecha_caducidad = ? WHERE codigo_lote = ?");
+                                    $stmtUpI->bind_param("iiiiisss", $producto_id, $cantidad, $cantidad, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $codigo_lote);
                                     $stmtUpI->execute();
                                     $stmtUpI->close();
 
-                                    registrar_bitacora("Producción editada", "Inventario", "El proveedor editó el registro del lote '$codigo_lote'. Nueva cantidad: $cantidad.");
+                                    registrar_bitacora("Producción editada", "Inventario", "El proveedor editó el registro del lote '$codigo_lote'. Nueva cantidad viables: $cantidad, no viables: $no_viable, mermas: $merma.");
                                     $conn->commit();
                                     $mensaje_exito = "¡La producción se actualizó correctamente!";
                                 } catch (Exception $e) {
@@ -306,6 +310,15 @@ $resP = $conn->query("SELECT id, nombre, tamano FROM productos WHERE activo = 1 
 while ($row = $resP->fetch_assoc()) {
     $productos[] = $row;
 }
+usort($productos, function($a, $b) {
+    $getWeight = function($p) {
+        $tamano = strtolower($p['tamano']);
+        if (strpos($tamano, 'chico') !== false) return 1;
+        if (strpos($tamano, 'mediano') !== false) return 2;
+        return 3;
+    };
+    return $getWeight($a) - $getWeight($b);
+});
 
 // Historial de Producción
 $historial = [];
@@ -431,7 +444,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
               <th>Lote</th>
               <th>Granja</th>
               <th>Tipo de Huevo</th>
-              <th>Cantidad</th>
+              <th>Viables</th>
+              <th>No Viables</th>
+              <th>Mermas</th>
               <th>Fecha Postura</th>
               <th>Observaciones</th>
               <th style="width: 130px; text-align: center;">Acciones</th>
@@ -448,6 +463,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                   <td>🚜 <?php echo htmlspecialchars($row["granja_nombre"] ?? "N/A"); ?></td>
                   <td><?php echo htmlspecialchars($row["producto_nombre"] . " (" . $row["producto_tamano"] . ")"); ?></td>
                   <td><strong style="color: var(--secondary);"><?php echo number_format($row["cantidad"]); ?> ud</strong></td>
+                  <td><span style="color: #ff8a00; font-weight: 700;"><?php echo number_format($row["no_viable"]); ?> ud</span></td>
+                  <td><span style="color: #b02500; font-weight: 700;"><?php echo number_format($row["merma"]); ?> ud</span></td>
                   <td><?php echo date("d/m/Y", strtotime($row["fecha_produccion"])); ?></td>
                   <td><span style="font-size:12px; color:var(--text-medium);"><?php echo htmlspecialchars($row["observaciones"] ?: "Sin observaciones"); ?></span></td>
                   <td>
@@ -464,7 +481,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
               <?php endforeach; ?>
             <?php else: ?>
               <tr>
-                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-medium);">No tienes producciones registradas actualmente.</td>
+                <td colspan="10" style="text-align: center; padding: 30px; color: var(--text-medium);">No tienes producciones registradas actualmente.</td>
               </tr>
             <?php endif; ?>
           </tbody>
@@ -544,22 +561,52 @@ $current_page = basename($_SERVER['PHP_SELF']);
               <label>Tipo de Huevo *</label>
               <select name="producto_id" required>
                 <option value="">-- Selecciona --</option>
-                <?php foreach ($productos as $p): ?>
-                  <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($p["nombre"] . " (" . $p["tamano"] . ")"); ?></option>
+                <?php foreach ($productos as $p): 
+                  if ($p['id'] == 2) continue; // Quitar Grande Tradicional
+                  
+                  $displayLabel = "";
+                  if (strpos(strtolower($p['tamano']), 'chico') !== false) {
+                      $displayLabel = "Chico";
+                  } elseif (strpos(strtolower($p['tamano']), 'mediano') !== false) {
+                      $displayLabel = "Mediano";
+                  } else {
+                      $displayLabel = "Grande";
+                  }
+                ?>
+                  <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($displayLabel); ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
 
             <div class="form-group">
-              <label>Cantidad Recolectada (Uds) *</label>
-              <input type="number" name="cantidad" min="1" placeholder="Ej: 300" oninput="updateCartonCalc(this.value, 'calc_cartones')" required>
-              <div style="font-size:12px; color:var(--secondary); font-weight:800; margin-top:4px;" id="calc_cartones">Se usarán aproximadamente 0 cartones de empaque.</div>
+              <label>Total Huevos Recolectados *</label>
+              <input type="number" id="add_total_recolectado" min="1" placeholder="Ej: 100" oninput="calculateViablesAdd()" required>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Fecha de Postura *</label>
-            <input type="date" name="fecha_produccion" value="<?php echo date('Y-m-d'); ?>" required>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>No Viables (Pigmentación Irregular)</label>
+              <input type="number" name="no_viable" id="add_no_viable" min="0" value="0" placeholder="Ej: 10" oninput="calculateViablesAdd()">
+            </div>
+
+            <div class="form-group">
+              <label>Mermas (Rotos / Dañados)</label>
+              <input type="number" name="merma" id="add_merma" min="0" value="0" placeholder="Ej: 5" oninput="calculateViablesAdd()">
+            </div>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Huevos Viables / Aptos (Uds) *</label>
+              <input type="number" name="cantidad" id="add_cantidad" min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Se calcula automáticamente" required>
+              <div style="font-size:12px; color:var(--secondary); font-weight:800; margin-top:4px;" id="calc_cartones">Se usarán aproximadamente 0 cartones de empaque.</div>
+            </div>
+
+            <div class="form-group">
+              <label>Fecha de Postura *</label>
+              <input type="date" name="fecha_produccion" value="<?php echo date('Y-m-d'); ?>" required>
+            </div>
           </div>
 
           <div class="form-group">
@@ -602,22 +649,52 @@ $current_page = basename($_SERVER['PHP_SELF']);
           <div class="form-group">
             <label>Tipo de Huevo *</label>
             <select name="producto_id" id="edit_producto_id" required>
-              <?php foreach ($productos as $p): ?>
-                <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($p["nombre"] . " (" . $p["tamano"] . ")"); ?></option>
+              <?php foreach ($productos as $p): 
+                if ($p['id'] == 2) continue; // Quitar Grande Tradicional
+                
+                $displayLabel = "";
+                if (strpos(strtolower($p['tamano']), 'chico') !== false) {
+                    $displayLabel = "Chico";
+                } elseif (strpos(strtolower($p['tamano']), 'mediano') !== false) {
+                    $displayLabel = "Mediano";
+                } else {
+                    $displayLabel = "Grande";
+                }
+              ?>
+                <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($displayLabel); ?></option>
               <?php endforeach; ?>
             </select>
           </div>
 
           <div class="form-group">
-            <label>Cantidad Recolectada (Uds) *</label>
-            <input type="number" name="cantidad" id="edit_cantidad" min="1" oninput="updateCartonCalc(this.value, 'edit_calc_cartones')" required>
-            <div style="font-size:12px; color:var(--secondary); font-weight:800; margin-top:4px;" id="edit_calc_cartones">Se usarán aproximadamente 0 cartones de empaque.</div>
+            <label>Total Huevos Recolectados *</label>
+            <input type="number" id="edit_total_recolectado" min="1" placeholder="Ej: 100" oninput="calculateViablesEdit()" required>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Fecha de Postura *</label>
-          <input type="date" name="fecha_produccion" id="edit_fecha_produccion" required>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>No Viables (Pigmentación Irregular)</label>
+            <input type="number" name="no_viable" id="edit_no_viable" min="0" value="0" oninput="calculateViablesEdit()">
+          </div>
+
+          <div class="form-group">
+            <label>Mermas (Rotos / Dañados)</label>
+            <input type="number" name="merma" id="edit_merma" min="0" value="0" oninput="calculateViablesEdit()">
+          </div>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Huevos Viables / Aptos (Uds) *</label>
+            <input type="number" name="cantidad" id="edit_cantidad" min="0" readonly style="background: rgba(0,0,0,0.03); cursor: not-allowed;" placeholder="Se calcula automáticamente" required>
+            <div style="font-size:12px; color:var(--secondary); font-weight:800; margin-top:4px;" id="edit_calc_cartones">Se usarán aproximadamente 0 cartones de empaque.</div>
+          </div>
+
+          <div class="form-group">
+            <label>Fecha de Postura *</label>
+            <input type="date" name="fecha_produccion" id="edit_fecha_produccion" required>
+          </div>
         </div>
 
         <div class="form-group">
@@ -661,7 +738,50 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <!-- Scripts de paginación e interactividad -->
 <script>
 function abrirModalCrear() {
+    document.getElementById('add_total_recolectado').value = '';
+    document.getElementById('add_no_viable').value = 0;
+    document.getElementById('add_merma').value = 0;
+    document.getElementById('add_cantidad').value = 0;
+    updateCartonCalc(0, 'calc_cartones');
     document.getElementById('modalCrear').classList.add('active');
+}
+
+function calculateViablesAdd() {
+    const totalInput = document.getElementById('add_total_recolectado');
+    const noViableInput = document.getElementById('add_no_viable');
+    const mermaInput = document.getElementById('add_merma');
+    const cantidadInput = document.getElementById('add_cantidad');
+    
+    if (!totalInput || !cantidadInput) return;
+    
+    const total = parseInt(totalInput.value) || 0;
+    const noViable = parseInt(noViableInput.value) || 0;
+    const merma = parseInt(mermaInput.value) || 0;
+    
+    let viables = total - noViable - merma;
+    if (viables < 0) viables = 0;
+    
+    cantidadInput.value = viables;
+    updateCartonCalc(viables, 'calc_cartones');
+}
+
+function calculateViablesEdit() {
+    const totalInput = document.getElementById('edit_total_recolectado');
+    const noViableInput = document.getElementById('edit_no_viable');
+    const mermaInput = document.getElementById('edit_merma');
+    const cantidadInput = document.getElementById('edit_cantidad');
+    
+    if (!totalInput || !cantidadInput) return;
+    
+    const total = parseInt(totalInput.value) || 0;
+    const noViable = parseInt(noViableInput.value) || 0;
+    const merma = parseInt(mermaInput.value) || 0;
+    
+    let viables = total - noViable - merma;
+    if (viables < 0) viables = 0;
+    
+    cantidadInput.value = viables;
+    updateCartonCalc(viables, 'edit_calc_cartones');
 }
 
 function abrirModalEditar(data) {
@@ -669,6 +789,14 @@ function abrirModalEditar(data) {
     document.getElementById('edit_granja_id').value = data.granja_id;
     document.getElementById('edit_producto_id').value = data.producto_id;
     document.getElementById('edit_cantidad').value = data.cantidad;
+    document.getElementById('edit_no_viable').value = data.no_viable;
+    document.getElementById('edit_merma').value = data.merma;
+    
+    const total = (parseInt(data.cantidad) || 0) + (parseInt(data.no_viable) || 0) + (parseInt(data.merma) || 0);
+    document.getElementById('edit_total_recolectado').value = total;
+    
+    updateCartonCalc(data.cantidad, 'edit_calc_cartones');
+    
     document.getElementById('edit_fecha_produccion').value = data.fecha_produccion;
     document.getElementById('edit_observaciones').value = data.observaciones;
     document.getElementById('modalEditar').classList.add('active');

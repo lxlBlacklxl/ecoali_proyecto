@@ -24,6 +24,8 @@ if (!$input) {
 $usuario_id = $_SESSION["usuario_id"];
 $producto_id = (int)($input["producto_id"] ?? 0);
 $cantidad = (int)($input["cantidad"] ?? 0);
+$no_viable = max(0, (int)($input["no_viable"] ?? 0));
+$merma = max(0, (int)($input["merma"] ?? 0));
 $fecha_produccion = trim($input["fecha_produccion"] ?? "");
 $observaciones = trim($input["observaciones"] ?? "");
 $granja_id = (int)($input["granja_id"] ?? 0);
@@ -98,19 +100,19 @@ try {
     $fecha_caducidad = date('Y-m-d', strtotime('+30 days', strtotime($fecha_produccion)));
 
     // 4. Registrar en la tabla `produccion`
-    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, fecha_produccion, observaciones, granja_id, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    $sqlInsertProd = "INSERT INTO produccion (proveedor_id, producto_id, cantidad, no_viable, merma, fecha_produccion, observaciones, granja_id, codigo_lote) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $stmtInsertProd = $conn->prepare($sqlInsertProd);
-    $stmtInsertProd->bind_param("iiissss", $proveedor_id, $producto_id, $cantidad, $fecha_produccion, $observaciones, $granja_id, $codigo_lote);
+    $stmtInsertProd->bind_param("iiiiissss", $proveedor_id, $producto_id, $cantidad, $no_viable, $merma, $fecha_produccion, $observaciones, $granja_id, $codigo_lote);
     
     if (!$stmtInsertProd->execute()) {
         throw new Exception("Error al registrar la producción: " . $conn->error);
     }
 
     // 5. Crear lote en `inventario_huevos`
-    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, fecha_postura, fecha_caducidad, estado, granja_id)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', ?)";
+    $sqlInsertInv = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, no_viable, merma, fecha_postura, fecha_caducidad, estado, granja_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?)";
     $stmtInsertInv = $conn->prepare($sqlInsertInv);
-    $stmtInsertInv->bind_param("iisiisssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $fecha_produccion, $fecha_caducidad, $granja_id);
+    $stmtInsertInv->bind_param("iisiiiissi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $no_viable, $merma, $fecha_produccion, $fecha_caducidad, $granja_id);
 
     if (!$stmtInsertInv->execute()) {
         throw new Exception("Error al ingresar el lote al inventario: " . $conn->error);
@@ -121,7 +123,7 @@ try {
     registrar_bitacora(
         "Producción registrada", 
         "Inventario", 
-        "El proveedor '$nCompleto' registró un lote de $cantidad huevos de '$prod_nombre' originarios de la granja '$granja_nombre' bajo el código de lote '$codigo_lote'."
+        "El proveedor '$nCompleto' registró un lote de $cantidad huevos viables ($no_viable no viables, $merma merma) de '$prod_nombre' originarios de la granja '$granja_nombre' bajo el código de lote '$codigo_lote'."
     );
 
     $conn->commit();

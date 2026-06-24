@@ -52,27 +52,35 @@ $pedidosPendientes = $pedPendRes ? $pedPendRes->fetch_row()[0] : 0;
 $pedRutaRes = $conn->query("SELECT COUNT(*) FROM pedidos WHERE estado = 'en_ruta'");
 $pedidosEnRuta = $pedRutaRes ? $pedRutaRes->fetch_row()[0] : 0;
 
-// 8. Producción Semanal (últimos 7 días)
-$prodSemRes = $conn->query("SELECT SUM(cantidad) FROM produccion WHERE fecha_produccion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
-$prodSemRow = $prodSemRes ? $prodSemRes->fetch_row() : null;
-$produccionSemanal = $prodSemRow && !is_null($prodSemRow[0]) ? (int)$prodSemRow[0] : 0;
+// 8. Producción Semanal (últimos 7 días) con desglose de calidad
+$prodSemRes = $conn->query("SELECT SUM(cantidad), SUM(no_viable), SUM(merma) FROM produccion WHERE fecha_produccion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
+$prodSemRow = $prodSemRes ? $prodSemRes->fetch_row() : [0, 0, 0];
+$prodSemViables = (int)($prodSemRow[0] ?? 0);
+$prodSemNoViables = (int)($prodSemRow[1] ?? 0);
+$prodSemMermas = (int)($prodSemRow[2] ?? 0);
+$produccionSemanal = $prodSemViables; 
 
 // Si está en 0 por falta de datos, podemos calcular a partir del inventario creado en los últimos 7 días como fallback
 if ($produccionSemanal === 0) {
     $prodSemRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE creado_en >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
     $prodSemRow = $prodSemRes ? $prodSemRes->fetch_row() : null;
     $produccionSemanal = $prodSemRow && !is_null($prodSemRow[0]) ? (int)$prodSemRow[0] : 0;
+    $prodSemViables = $produccionSemanal;
 }
 
-// 9. Producción Mensual (últimos 30 días)
-$prodMenRes = $conn->query("SELECT SUM(cantidad) FROM produccion WHERE fecha_produccion >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
-$prodMenRow = $prodMenRes ? $prodMenRes->fetch_row() : null;
-$produccionMensual = $prodMenRow && !is_null($prodMenRow[0]) ? (int)$prodMenRow[0] : 0;
+// 9. Producción Mensual (últimos 30 días) con desglose de calidad
+$prodMenRes = $conn->query("SELECT SUM(cantidad), SUM(no_viable), SUM(merma) FROM produccion WHERE fecha_produccion >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+$prodMenRow = $prodMenRes ? $prodMenRes->fetch_row() : [0, 0, 0];
+$prodMenViables = (int)($prodMenRow[0] ?? 0);
+$prodMenNoViables = (int)($prodMenRow[1] ?? 0);
+$prodMenMermas = (int)($prodMenRow[2] ?? 0);
+$produccionMensual = $prodMenViables; 
 
 if ($produccionMensual === 0) {
     $prodMenRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE creado_en >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
     $prodMenRow = $prodMenRes ? $prodMenRes->fetch_row() : null;
     $produccionMensual = $prodMenRow && !is_null($prodMenRow[0]) ? (int)$prodMenRow[0] : 0;
+    $prodMenViables = $produccionMensual;
 }
 
 // 10. Stock Bajo (lotes disponibles con menos de 100 huevos)
@@ -306,14 +314,28 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
         <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px; color:#176a21;"><?php echo number_format($stockTotal); ?> ud</div></div>
       </div>
 
-      <div class="background-border" style="padding: 20px; min-height: auto;">
-        <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">PRODUCCIÓN SEMANAL</div></div>
-        <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px;"><?php echo number_format($produccionSemanal); ?> ud</div></div>
+      <div class="background-border" style="padding: 20px; min-height: auto; border-color: rgba(213, 164, 112, 0.25);">
+        <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">PRODUCCIÓN SEMANAL (TOTAL)</div></div>
+        <div class="div-2" style="margin-top: 8px;">
+          <div class="text-wrapper-3" style="font-size:26px;"><?php echo number_format($prodSemViables + $prodSemNoViables + $prodSemMermas); ?> ud</div>
+          <div style="font-size: 11px; font-weight: 700; color: #7a5427; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+            <span style="color:#176a21;">✓ Viables: <?php echo number_format($prodSemViables); ?> ud</span>
+            <span style="color:#ff8a00;">🎨 No Viables: <?php echo number_format($prodSemNoViables); ?> ud</span>
+            <span style="color:#b02500;">🩹 Merma: <?php echo number_format($prodSemMermas); ?> ud</span>
+          </div>
+        </div>
       </div>
 
-      <div class="background-border-2" style="padding: 20px; min-height: auto;">
-        <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">PRODUCCIÓN MENSUAL</div></div>
-        <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px;"><?php echo number_format($produccionMensual); ?> ud</div></div>
+      <div class="background-border-2" style="padding: 20px; min-height: auto; border-color: rgba(213, 164, 112, 0.25);">
+        <div class="container-5"><div class="text-wrapper-2" style="font-size:10px;">PRODUCCIÓN MENSUAL (TOTAL)</div></div>
+        <div class="div-2" style="margin-top: 8px;">
+          <div class="text-wrapper-3" style="font-size:26px;"><?php echo number_format($prodMenViables + $prodMenNoViables + $prodMenMermas); ?> ud</div>
+          <div style="font-size: 11px; font-weight: 700; color: #7a5427; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+            <span style="color:#176a21;">✓ Viables: <?php echo number_format($prodMenViables); ?> ud</span>
+            <span style="color:#ff8a00;">🎨 No Viables: <?php echo number_format($prodMenNoViables); ?> ud</span>
+            <span style="color:#b02500;">🩹 Merma: <?php echo number_format($prodMenMermas); ?> ud</span>
+          </div>
+        </div>
       </div>
 
       <div class="background-border" style="padding: 20px; min-height: auto; border-color: rgba(176, 37, 0, 0.2);">
@@ -341,7 +363,7 @@ $resultUltPedidos = $conn->query($sqlUltPedidos);
 
       <div class="background-border-3" style="padding: 20px; min-height: auto; border-color: rgba(176, 37, 0, 0.2);">
         <div class="container-5"><div class="text-wrapper-2" style="font-size:10px; color:#b02500;">ENTREGAS RETRASADAS</div></div>
-        <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px; color:#b02500;"><?php echo $entregasRetrasadas; ?></div></div>
+        <div class="div-2" style="margin-top: 8px;"><div class="text-wrapper-3" style="font-size:26px; color:#b02500;"><?php echo $totalRetrasados; ?></div></div>
       </div>
     </div>
 

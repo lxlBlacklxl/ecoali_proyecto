@@ -1,6 +1,6 @@
 # 🌿 EcoAli - Plataforma de Trazabilidad Orgánica y Gestión de Lotes
 
-EcoAli es una plataforma web premium de comercio justo, trazabilidad y gestión logística para productos orgánicos y avícolas. El sistema conecta directamente a productores avícolas (proveedores), clientes finales y repartidores logísticos bajo la supervisión de un centro de control administrativo integral.
+EcoAli es una plataforma web premium de comercio justo, trazabilidad y gestión logística para productos orgánicos y avícolas. El sistema conecta directamente a productores avícolas (proveedores/granjeros), clientes finales y repartidores logísticos bajo la supervisión de un centro de control administrativo integral.
 
 El software destaca por su alto estándar visual, su diseño limpio y minimalista, y un sistema responsivo híbrido adaptado a las necesidades de cada usuario según su dispositivo.
 
@@ -8,46 +8,65 @@ El software destaca por su alto estándar visual, su diseño limpio y minimalist
 
 ## 🛠️ Arquitectura y Stack Tecnológico
 
-El proyecto está diseñado bajo un enfoque modular y orientado a eventos empleando tecnologías nativas estables para maximizar la velocidad y compatibilidad:
+El proyecto está diseñado bajo un enfoque modular y orientado a eventos empleando tecnologías estables para maximizar la velocidad y compatibilidad:
 
-*   **Backend**: PHP 8.x con arquitectura procedimental limpia e interactiva.
-*   **Base de Datos**: MySQL / MariaDB con llaves foráneas, transacciones seguras e índices optimizados.
+*   **Backend**: PHP 8.x con arquitectura procedimental limpia, estructurada y modular.
+*   **Base de Datos**: MySQL / MariaDB con llaves foráneas, restricciones de integridad referencial (`ON DELETE CASCADE`), transacciones seguras e índices optimizados.
 *   **Frontend**: HTML5 Semántico, CSS3 Premium con variables globales (`:root`), transiciones dinámicas y micro-animaciones, junto a Vanilla JavaScript para la manipulación asíncrona del DOM.
-*   **Comunicación asíncrona**: Peticiones AJAX mediante la API `fetch` para operaciones sin recarga de pantalla (enviar producción, actualizar perfiles, cambiar estados logísticos).
-*   **Seguridad**: Encriptación hash bcrypt para contraseñas, validación de sesiones activas, protección contra inyecciones SQL usando consultas preparadas (Prepared Statements) e integración con Google Sign-In (OAuth 2.0).
+*   **Servicios Externos**: 
+    *   **Bing Maps API**: Integración avanzada con mapas interactivos de Microsoft, empleando estilos premium oscuros (`canvasDark`) y supresión dinámica en tiempo real de banners de error de credenciales.
+    *   **Web Speech API**: Asistente virtual accesible ("Doña Ali") con síntesis de voz femenina personalizada y reconocimiento de voz (dictado por micrófono) para interacciones ágiles.
+*   **Seguridad**: Encriptación hash bcrypt para contraseñas, validación de sesiones activas por roles, protección contra inyecciones SQL usando consultas preparadas (Prepared Statements) e integración con Google Sign-In (OAuth 2.0).
 
 ---
 
 ## 📂 Estructura del Proyecto
 
-El código está estructurado de manera organizada, separando la lógica de backend de la visualización y los recursos del sistema:
+El código está organizado separando la lógica del backend (controladores AJAX y procesamiento de formularios) de los recursos visuales del frontend:
 
 ```bash
 ecoali_proyecto/
 ├── assets/                    # Recursos estáticos del frontend
 │   ├── css/                   # Hojas de estilo unificadas
-│   │   ├── globals.css        # Sistema de diseño global (tipografía, colores, responsive, etc.)
+│   │   ├── globals.css        # Sistema de diseño global (variables de color, tipografía, reset)
+│   │   ├── admin.css          # Estilos del panel administrativo general
+│   │   ├── cliente.css        # Estilos del catálogo e interfaces del cliente
+│   │   ├── proveedor.css      # Estilos del panel de control de granjeros
+│   │   ├── repartidor.css     # Estilos de la hoja de ruta y mapas de repartidores
 │   │   ├── inventario_admin.css
-│   │   ├── proveedor.css
-│   │   └── repartidor.css
+│   │   ├── proveedores_admin.css
+│   │   └── style.css          # Estilos complementarios y de login/registro
 │   └── js/                    # Scripts dinámicos
-│       └── admin_menu.js      # Lógica del menú hamburguesa del administrador
-├── forms/                     # Controladores y lógica de peticiones backend (AJAX y Forms)
-│   ├── conexion.php           # Configuración del puente a base de datos (PDO/MySQLi)
-│   ├── config_mail.php        # Configuración de servidor de correos SMTP
-│   ├── procesar_login.php     # Validación y creación de sesiones
-│   ├── procesar_pedido.php    # Creación y guardado transaccional de órdenes de compra
-│   ├── procesar_produccion.php# Registro de recolección diaria de lotes (proveedores)
-│   ├── *perfil.php            # Controladores de actualización de datos de usuario
-│   └── *_acciones.php         # Controladores CRUD (Usuarios, Productos, Clientes, Inventario)
-├── dashboard_admin.php        # Tablero de control general del administrador
-├── dashboard_cliente.php      # Panel del cliente (Catálogo y pedidos)
-├── dashboard_proveedor.php    # Panel del proveedor avícola (Producción y lotes)
-├── dashboard_repartidor.php   # Panel del repartidor (Entrega y rutas logísticas)
-├── bitacora_admin.php         # Módulo administrativo para auditoría del sistema
-├── login.php                  # Pantalla de acceso y autenticación corporativa
-├── register.php               # Formulario de autoregistro de clientes
-└── README.md                  # Documentación oficial del proyecto
+│       └── admin_menu.js      # Control de navegación móvil del administrador
+├── forms/                     # Controladores y lógica de backend (Peticiones AJAX y Procesamiento)
+│   ├── conexion.php           # Conector maestro MySQLi, migraciones de tablas y caducidad automática de lotes
+│   ├── config_mail.php        # Configuración del servidor de correos SMTP para notificaciones
+│   ├── procesar_login.php     # Validación de credenciales y creación de sesiones de usuario
+│   ├── procesar_pedido.php    # Procesamiento transaccional de compras (FIFO, cupones, IVA, regalías)
+│   ├── procesar_produccion.php# Registro de postura y generación de lotes avícolas
+│   ├── cancelar_pedido.php    # Cancelación segura de compras con retorno automático de stock (FIFO Restore)
+│   ├── reportar_incidencia.php# Registro de incidencias en ruta con geolocalización GPS
+│   ├── actualizar_estado_entrega.php # Cierre de entregas (captura de firma Canvas, foto Base64 y GPS)
+│   ├── google_login.php       # Autenticación con cuenta de Google (OAuth 2.0)
+│   ├── exportar_reporte.php   # Exportador de reportes de producción a formato CSV
+│   ├── *_acciones.php         # Controladores CRUD (Usuarios, Clientes, Proveedores, Inventario, Regalías)
+│   └── perfil_*.php           # Controladores de actualización de perfil para cada rol
+├── dashboard_admin.php        # Panel de control maestro del administrador
+├── dashboard_cliente.php      # Portal interactivo del cliente (tienda, carrito, recompensas, Doña Ali)
+├── dashboard_proveedor.php    # Portal del granjero (producción, control de granjas, envíos a CEDIS)
+├── dashboard_repartidor.php   # Interfaz del conductor (hoja de ruta, mapas Bing, Canvas, geolocalización)
+├── usuarios_admin.php         # Módulo administrativo para gestión de cuentas de usuario
+├── clientes_admin.php         # Módulo administrativo para supervisión de clientes
+├── proveedores_admin.php      # Módulo administrativo para supervisión de proveedores
+├── inventario_admin.php       # Módulo administrativo para stock global y lotes
+├── logistica_admin.php        # Módulo de despacho, asignación de rutas y pedidos atrasados
+├── bitacora_admin.php         # Registro inmutable de auditoría y logs del sistema
+├── editar_perfil.php          # Pantalla unificada de perfil y datos de contacto
+├── login.php                  # Pantalla de acceso corporativa y Google Login
+├── register.php               # Formulario de auto-registro de clientes
+├── verificar_codigo.php       # Verificación en dos pasos (2FA) para registros seguros
+├── comprobante.php            # Generador visual de comprobantes de entrega/pedido
+└── README.md                  # Documentación técnica oficial del proyecto
 ```
 
 ---
@@ -58,57 +77,71 @@ El sistema cuenta con cuatro perfiles de usuario perfectamente definidos, cada u
 
 ```mermaid
 graph TD
-    A[ECOALI SYSTEM] --> B(Administrador)
-    A --> C(Cliente)
-    A --> D(Proveedor Avícola)
-    A --> E(Repartidor Logístico)
+    A["ECOALI SYSTEM"] --> B["Administrador"]
+    A --> C["Cliente"]
+    A --> D["Proveedor / Granjero"]
+    A --> E["Repartidor Logístico"]
 
-    B --> B1[Gestión CRUD Completa]
-    B --> B2[Control de Inventario]
-    B --> B3[Logística de Rutas]
-    B --> B4[Bitácora de Auditoría]
+    B --> B1["Gestión CRUD Completa & Paginación 5x5"]
+    B --> B2["Control de Inventario FIFO y Lotes"]
+    B --> B3["Asignación Logística con Bloqueo de Costos"]
+    B --> B4["Bitácora de Auditoría Inmutable"]
 
-    C --> C1[Catálogo de Productos]
-    C --> C2[Carrito Transaccional]
-    C --> C3[Programa de Regalías]
-    C --> C4[Perfil y Pedidos]
+    C --> C1["Catálogo con Búsqueda en Tiempo Real"]
+    C --> C2["Checkout con Doble Bloqueo e Input Sanitizers"]
+    C --> C3["Asistente de Voz Doña Ali"]
+    C --> C4["Notificaciones Swipe-to-Delete"]
 
-    D --> D1[Postura y Recolección Diaria]
-    D --> D2[Trazabilidad de Lotes]
-    D --> D3[Control de Stock Avícola]
+    D --> D1["Postura Diaria & Trazabilidad de Lotes"]
+    D --> D2["Registro de Granjas & Envíos a CEDIS"]
+    D --> D3["Asistente de Voz Doña Ali"]
 
-    E --> E1[Lista de Entregas Activas]
-    E --> E2[Control de Estados de Ruta]
-    E --> E3[Historial de Entregas]
+    E --> E1["Hoja de Ruta con Bing Maps canvasDark"]
+    E --> E2["Firma Canvas & Fotos Base64 en Entregas"]
+    E --> E3["Reporte de Incidencias & Retorno de Stock"]
 ```
 
 ### 1. Módulo del Administrador (`dashboard_admin.php`)
-Es el núcleo administrativo del sistema. Permite supervisar y modificar el estado global del negocio.
-*   **Gestión de Cuentas (`usuarios_admin.php`, `clientes_admin.php`, `proveedores_admin.php`)**: Control total de usuarios, roles y activaciones de cuentas de todos los actores.
-*   **Control de Inventario y Productos (`productos_admin.php`, `inventario_admin.php`)**: Catálogo maestro de productos orgánicos y asignación de lotes en stock.
-*   **Logística y Despachos (`logistica_admin.php`)**: Asignación de pedidos a repartidores específicos y monitoreo en tiempo real.
-*   **Auditoría y Bitácora (`bitacora_admin.php`)**: Historial inmutable que registra cada acción relevante en el sistema (quién modificó un perfil, cuándo se autorizó un despacho, inicios de sesión, etc.).
-*   **Navegación**: Utiliza un panel lateral fijo en computadoras y un **menú deslizante tipo hamburguesa** con overlay translúcido de protección en tabletas y móviles.
+Es el centro de control del negocio. Permite supervisar y modificar el estado del sistema.
+*   **Gestión de Cuentas (`usuarios_admin.php`, `clientes_admin.php`, `proveedores_admin.php`)**: Control total de usuarios, roles y activaciones. Las tablas incluyen paginación dinámica interactiva de 5 en 5 registros.
+*   **Control de Inventario y Productos (`productos_admin.php`, `inventario_admin.php`)**: Catálogo maestro de productos y asignación de lotes en stock global.
+*   **Logística y Despachos (`logistica_admin.php`)**: Permite asignar pedidos a conductores específicos. Bloquea de forma estricta los inputs de costos para que sean de solo lectura (`readonly`). Destaca de forma visual (en rojo) los pedidos atrasados ordenándolos al inicio.
+*   **Auditoría y Bitácora (`bitacora_admin.php`)**: Módulo que registra de forma inmutable cada acción relevante en el sistema (IP, usuario, módulo afectado, acción detallada y fecha/hora) con paginación optimizada.
 
 ### 2. Módulo del Cliente (`dashboard_cliente.php`)
-Diseñado para ofrecer una experiencia de compra fluida, rápida y sumamente visual.
-*   **Catálogo Interactivo**: Tarjetas de productos orgánicos con detalles de frescura, stock y precios.
-*   **Carrito de Compras Transaccional**: Procesamiento seguro de pedidos directamente en base de datos.
-*   **Programa de Regalías**: Sistema de fidelización que premia las compras recurrentes del cliente con puntos canjeables por productos orgánicos gratuitos.
-*   **Navegación**: En dispositivos móviles y tabletas cuenta con una **barra de navegación inferior compacta** de 50px de alto, eliminando estorbos visuales superiores.
+Portal transaccional diseñado para ofrecer una experiencia de compra fluida, rápida y sumamente visual.
+*   **Catálogo Interactivo**: Búsqueda y filtrado de productos en tiempo real sin recargar la página.
+*   **Checkout con Doble Bloqueo**: Previene la duplicación accidental de pedidos mediante un bloqueo global de procesamiento de pagos (`isProcessingCheckout`) y sanitización en tiempo real de campos de tarjetas con expresiones regulares.
+*   **Direcciones de Envío Estructuradas**: Adaptado para México con un desglose completo de dirección (Calle, Número, Colonia, Código Postal, Ciudad, Localidad) y selector dinámico de los 32 estados de la República.
+*   **Asistente Virtual Doña Ali**: Burbuja flotante interactiva que ayuda al cliente a comprar, entender regalías o programar envíos mediante comandos de voz y lectura de respuestas.
+*   **Gestión de Notificaciones**: Bandeja deslizante con soporte para eliminación individual interactiva mediante micro-animación de deslizamiento a la izquierda (swipe-left) y borrado total dinámico.
+*   **Cancelación de Pedidos**: Los clientes pueden cancelar sus pedidos pendientes de forma segura. El stock se reincorpora al inventario automáticamente.
 
 ### 3. Módulo del Proveedor Avícola (`dashboard_proveedor.php`)
-Optimizado para el trabajo en granja y almacén avícola.
-*   **Registrar Postura Diaria**: Formulario dinámico para ingresar la recolección del día (huevos, tipo, cantidad, estado).
-*   **Control de Lotes y Trazabilidad**: Visualización de los lotes activos en almacén listos para recolección logística.
-*   **Navegación**: Totalmente libre de barras de hamburguesa en móvil/tableta; utiliza el **menú de navegación inferior compacto** de 50px de altura para un acceso sumamente ágil con una sola mano.
+Diseñado para la gestión ágil del inventario avícola en el campo.
+*   **Postura Diaria (`produccion_proveedor.php`)**: Formulario interactivo para registrar la recolección del día (huevos, tipo, cantidad, estado y código de lote autogenerado).
+*   **Control de Granjas (`granjas_acciones.php`)**: Registro y administración de diferentes granjas asociadas al proveedor.
+*   **Envíos a CEDIS (`entregas_proveedor.php`)**: Creación de solicitudes de envío de lotes al Centro de Distribución (CEDIS) para la cadena logística.
+*   **Asistente Virtual Doña Ali**: Implementado también en esta interfaz para facilitar el uso a granjeros de la tercera edad o con problemas de visibilidad.
 
 ### 4. Módulo del Repartidor Logístico (`dashboard_repartidor.php`)
-Diseñado para la eficiencia en ruta y entregas de última milla.
-*   **Lista de Paradas Activas**: Resumen claro de los pedidos pendientes de entrega con dirección del cliente, teléfono y total.
-*   **Estados Logísticos Dinámicos**: Permite actualizar el estado del pedido en tiempo real (En Camino ➔ Entregado ➔ Cancelado).
-*   **Historial de Ruta**: Registro de los despachos completados exitosamente.
-*   **Navegación**: Optimizado con el **menú inferior ultra-compacto** de 50px de altura y sin botones superiores distractores.
+Optimizado para dispositivos móviles en ruta de última milla.
+*   **Hoja de Ruta Interactiva**: Despliega un listado de entregas con direcciones del cliente, desglose detallado de cantidades e integraciones con Bing Maps en tono oscuro para trazar la ruta de reparto.
+*   **Firma Manuscrita HTML5 Canvas**: Captura la firma digital del receptor en tiempo real dentro del modal de despacho.
+*   **Evidencia Fotográfica**: Carga y previsualización obligatoria en Base64 de la fotografía física de la entrega para fines de control de calidad.
+*   **Geolocalización GPS**: Captura de coordenadas geográficas en tiempo real (Latitud/Longitud) al realizar el despacho.
+*   **Reporte de Incidencias**: Permite reportar eventualidades (cliente ausente, dirección errónea, producto dañado) con la opción de cancelar la entrega y reintegrar el stock de forma inmediata.
+
+---
+
+## ⚙️ Reglas de Negocio Automatizadas en Base de Datos (conexion.php)
+
+El archivo `forms/conexion.php` no solo establece la comunicación de datos, sino que actúa como el motor de reglas y mantenimiento automatizado del sistema:
+
+1.  **Migración Automática**: Ejecuta sentencias `CREATE TABLE IF NOT EXISTS` y `ALTER TABLE ADD COLUMN` en cada conexión del sistema, asegurando que las tablas como `bitacora`, `regalias`, `granjas`, `cedis`, `entregas_cedis`, `detalle_entrega_cedis`, `incidencias`, `cupones` y `promociones` existan con sus columnas de auditoría, coordenadas GPS, firmas Base64 y evidencias fotográficas.
+2.  **Seeding de Datos**: Si las tablas de `cedis`, `cupones` y `promociones` están vacías, las puebla automáticamente con datos de prueba estables (ej. cupones `ECO20`, `FRESCO10`, `AHORRO5`).
+3.  **Caducidad Automática de Lotes (Regla de Negocio #6)**: En cada conexión a la base de datos, el sistema consulta los lotes disponibles cuya fecha de postura exceda los 3 días de antigüedad. Los actualiza automáticamente a estado `'caducado'`, bloqueándolos para venta al público, y registra el evento en la bitácora de auditoría detallando qué lotes fueron retirados.
+4.  **Descuento e Integración FIFO (First In, First Out)**: Al realizar una compra, `forms/procesar_pedido.php` recorre el inventario y descuenta las cantidades de los lotes de huevo disponibles ordenándolos del más antiguo al más nuevo. Si una orden se cancela, `forms/cancelar_pedido.php` reincorpora el stock de vuelta al lote más reciente del producto seleccionado para mantener la consistencia.
 
 ---
 
@@ -117,21 +150,22 @@ Diseñado para la eficiencia en ruta y entregas de última milla.
 El sistema utiliza un paradigma híbrido de visualización enfocado en la usabilidad según el dispositivo (Desktop vs. Tableta/Móvil):
 
 ### Computadoras de Escritorio (Desktop: > 991px)
-Todos los paneles despliegan una **barra lateral izquierda de navegación fija** con tipografía premium y bordes curvos de cristal templado, garantizando que todas las secciones estén a un solo clic de distancia.
+Todos los paneles despliegan una **barra lateral izquierda de navegación fija** con tipografía premium (Outfit / Inter) y bordes curvos de cristal templado, garantizando que todas las secciones estén a un solo clic de distancia.
 
 ### Teléfonos Móviles y Tabletas (Responsivo: <= 991px)
-Para los paneles de **Cliente, Proveedor y Repartidor**, se prioriza la visualización táctil:
+Para los paneles de **Cliente, Proveedor y Repartidor**, se prioriza la navegación móvil táctil con una sola mano:
 *   **Ocultamiento de Barra Lateral**: Se esconde automáticamente al 100% para liberar el ancho total de la pantalla.
 *   **Barra de Navegación Inferior Ultra-Compacta (`.mobile-nav`)**:
     *   **Altura**: `50px`
     *   **Tamaño de Iconos**: `15px`
-    *   **Tamaño de Texto**: `12px` con peso extra-negrita (`800`)
-    *   **Micro-Animaciones**: Al tocar una pestaña, el icono activo realiza un sutil zoom táctil del `12%` (`transform: scale(1.12)`).
+    *   **Tamaño de Texto**: `12px` con peso extra-negrita (`800`).
+    *   **Micro-Animaciones**: Al tocar una pestaña, el icono activo realiza un zoom táctil del `12%` (`transform: scale(1.12)`).
     *   **Fondo**: Cristal blanco esmerilado (`backdrop-filter: blur(12px)`) con sombreado sutil que flota elegantemente en la base.
 
 Para el panel de **Administrador**:
 *   Se despliega un **botón flotante de hamburguesa** en la esquina superior izquierda.
 *   Al presionarlo, emerge de manera fluida un cajón lateral deslizante (`.aside`) con un overlay oscuro cálido en el fondo (`.admin-menu-overlay`) que bloquea las interacciones traseras y redirige el foco al menú de administración.
+*   **Tablas Adaptativas**: Soporte para desplazamiento horizontal fluido (`overflow-x: auto`) para evitar el aplastamiento de columnas en teléfonos móviles.
 
 ---
 
@@ -141,10 +175,15 @@ El sistema opera sobre una base de datos relacional con las siguientes tablas cl
 
 1.  **`usuarios`**: Almacena las credenciales de acceso, estado activo/inactivo, rol (`rol_id`), código de verificación y tokens de inicio de sesión.
 2.  **`usuario_perfil`**: Información detallada de contacto ligada al usuario (Nombre, Apellido, Email, Teléfono, Dirección).
-3.  **`lotes`**: Control de stock avícola. Vincula la producción registrada por un proveedor con un código único de trazabilidad orgánica.
-4.  **`pedidos`**: Encabezado de órdenes de compra con repartidor asignado, estado logístico, dirección y total.
-5.  **`regalias`**: Historial de puntos y recompensas acumulados por cliente.
-6.  **`bitacora`**: El libro de auditoría del administrador. Guarda el registro de operaciones, IP, usuario y descripción de la acción.
+3.  **`granjas`**: Catálogo de granjas asignadas a proveedores con stock de cartones.
+4.  **`cedis`**: Centros de Distribución donde se consolidan los envíos de los proveedores.
+5.  **`entregas_cedis` / `detalle_entrega_cedis`**: Control de envíos del proveedor al CEDIS para su empaquetado y posterior distribución.
+6.  **`inventario_huevos`**: Control de stock de lotes avícolas con trazabilidad por fecha de postura, cantidad inicial, cantidad restante y estado de caducidad.
+7.  **`pedidos` / `detalle_pedido`**: Cabecera y detalle de las compras del cliente, incluyendo descuento aplicado, código de cupón, subtotal, IVA y datos de entrega física (coordenadas, firma Canvas y foto Base64).
+8.  **`regalias`**: Historial de puntos y recompensas acumulados por referido (10% de comisión).
+9.  **`incidencias`**: Control y reportes de anomalías presentadas en las rutas de entrega de los repartidores.
+10. **`cupones` / `promociones`**: Descuentos aplicables en checkout por código de cupón o promoción automática según monto mínimo de compra.
+11. **`bitacora`**: Libro de auditoría inmutable que registra cada operación en el sistema.
 
 ---
 
@@ -153,7 +192,7 @@ El sistema opera sobre una base de datos relacional con las siguientes tablas cl
 Para ejecutar el proyecto EcoAli en un entorno de desarrollo local:
 
 ### 1. Requisitos Previos
-*   Instalar **XAMPP** (con PHP 8.0 o superior y MySQL).
+*   Instalar **XAMPP** (con PHP 8.0 o superior y MySQL / MariaDB).
 *   Un editor de código (VS Code recomendado).
 
 ### 2. Configuración de Directorios
@@ -165,16 +204,17 @@ Para ejecutar el proyecto EcoAli en un entorno de desarrollo local:
 
 ### 3. Configuración de la Base de Datos
 1.  Ingresa a tu navegador a `http://localhost/phpmyadmin/`.
-2.  Crea una nueva base de datos llamada `ecoali` (o el nombre configurado en tu conexión).
+2.  Crea una nueva base de datos llamada `ecoali` con el cotejamiento `utf8mb4_general_ci`.
 3.  Importa el archivo SQL del proyecto (normalmente ubicado en la carpeta del instalador o raíz).
 4.  Verifica los datos de conexión en el archivo:
     `[forms/conexion.php](file:///d:/xampp/htdocs/ecoali_proyecto/forms/conexion.php)`
     ```php
-    $host = "localhost";
-    $user = "root";
+    $host = "127.0.0.1";
+    $usuario = "root";
     $password = "";
-    $dbname = "ecoali"; // Verifica que coincida con tu base de datos
+    $bd = "ecoali"; // Verifica que coincida con tu base de datos
     ```
+    *Nota: Al conectarse por primera vez, el script se encargará automáticamente de ejecutar las migraciones y sembrar cupones, promociones y CEDIS si no existieran.*
 
 ### 4. Ejecución del Sistema
 Ingresa al navegador y accede a la URL local del proyecto:

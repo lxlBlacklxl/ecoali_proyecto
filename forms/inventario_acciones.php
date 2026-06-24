@@ -27,6 +27,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $producto_id = (int)($_POST["producto_id"] ?? 0);
         $codigo_lote = trim($_POST["codigo_lote"] ?? "");
         $cantidad = (int)($_POST["cantidad"] ?? 0);
+        $no_viable = max(0, (int)($_POST["no_viable"] ?? 0));
+        $merma = max(0, (int)($_POST["merma"] ?? 0));
         $fecha_postura = trim($_POST["fecha_postura"] ?? null);
         $fecha_caducidad = trim($_POST["fecha_caducidad"] ?? null);
         $estado = trim($_POST["estado"] ?? "disponible");
@@ -45,16 +47,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
         }
 
-        $sql = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad, fecha_postura, fecha_caducidad, estado) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO inventario_huevos (proveedor_id, producto_id, codigo_lote, cantidad_inicial, cantidad, no_viable, merma, fecha_postura, fecha_caducidad, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iisssss", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_postura, $fecha_caducidad, $estado);
+        $stmt->bind_param("iisiiiisss", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $no_viable, $merma, $fecha_postura, $fecha_caducidad, $estado);
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "Lote agregado al inventario correctamente.";
             if ($estado === 'caducado') {
                 $_SESSION["mensaje_exito"] .= " Nota: Se guardó automáticamente como CADUCADO por antigüedad superior a 3 días.";
             }
-            auditar_accion("Inventario", "Lote creado", "Se agregó el lote #$codigo_lote con $cantidad huevos. Estado: " . strtoupper($estado));
+            auditar_accion("Inventario", "Lote creado", "Se agregó el lote #$codigo_lote con $cantidad huevos viables ($no_viable no viables, $merma mermas). Estado: " . strtoupper($estado));
         } else {
             $_SESSION["mensaje_error"] = "Error al agregar lote: " . $conn->error;
         }
@@ -67,6 +69,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $producto_id = (int)($_POST["producto_id"] ?? 0);
         $codigo_lote = trim($_POST["codigo_lote"] ?? "");
         $cantidad = (int)($_POST["cantidad"] ?? 0);
+        $no_viable = max(0, (int)($_POST["no_viable"] ?? 0));
+        $merma = max(0, (int)($_POST["merma"] ?? 0));
         $fecha_postura = trim($_POST["fecha_postura"] ?? null);
         $fecha_caducidad = trim($_POST["fecha_caducidad"] ?? null);
         $estado = trim($_POST["estado"] ?? "disponible");
@@ -85,16 +89,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
         }
 
-        $sql = "UPDATE inventario_huevos SET proveedor_id = ?, producto_id = ?, codigo_lote = ?, cantidad = ?, fecha_postura = ?, fecha_caducidad = ?, estado = ? WHERE id = ?";
+        $sql = "UPDATE inventario_huevos SET proveedor_id = ?, producto_id = ?, codigo_lote = ?, cantidad_inicial = ?, cantidad = ?, no_viable = ?, merma = ?, fecha_postura = ?, fecha_caducidad = ?, estado = ? WHERE id = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iisssssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $fecha_postura, $fecha_caducidad, $estado, $id);
+        $stmt->bind_param("iisiiiisssi", $proveedor_id, $producto_id, $codigo_lote, $cantidad, $cantidad, $no_viable, $merma, $fecha_postura, $fecha_caducidad, $estado, $id);
 
         if ($stmt->execute()) {
             $_SESSION["mensaje_exito"] = "Lote de inventario actualizado correctamente.";
             if ($estado === 'caducado') {
                 $_SESSION["mensaje_exito"] .= " Nota: Se marcó automáticamente como CADUCADO por antigüedad superior a 3 días.";
             }
-            auditar_accion("Inventario", "Lote editado", "Se actualizó el lote #$codigo_lote. Nueva cantidad: $cantidad unidades. Estado: " . strtoupper($estado));
+            auditar_accion("Inventario", "Lote editado", "Se actualizó el lote #$codigo_lote. Nueva cantidad: $cantidad unidades viables ($no_viable no viables, $merma mermas). Estado: " . strtoupper($estado));
         } else {
             $_SESSION["mensaje_error"] = "Error al actualizar lote: " . $conn->error;
         }

@@ -30,9 +30,14 @@ $tipo_reporte = $_GET["tipo_reporte"] ?? "ventas";
 $ingresosRes = $conn->query("SELECT SUM(total) FROM pedidos WHERE estado = 'entregado' AND DATE(fecha_pedido) BETWEEN '$fecha_inicio' AND '$fecha_fin'");
 $ingresosTotales = $ingresosRes && !is_null($row = $ingresosRes->fetch_row()) ? (float)$row[0] : 0.0;
 
-// 2. Huevos Producidos (Suma de lotes del inventario)
-$produccionRes = $conn->query("SELECT SUM(cantidad) FROM inventario_huevos WHERE DATE(fecha_postura) BETWEEN '$fecha_inicio' AND '$fecha_fin'");
-$huevosProducidos = $produccionRes && !is_null($row = $produccionRes->fetch_row()) ? (int)$row[0] : 0;
+// 2. Huevos Producidos (Detallado por calidad y total recolectado)
+$prodRes = $conn->query("SELECT SUM(cantidad), SUM(no_viable), SUM(merma) FROM produccion WHERE DATE(fecha_produccion) BETWEEN '$fecha_inicio' AND '$fecha_fin'");
+$prodRow = $prodRes ? $prodRes->fetch_row() : [0, 0, 0];
+$huevosViables = (int)($prodRow[0] ?? 0);
+$huevosNoViables = (int)($prodRow[1] ?? 0);
+$huevosMermas = (int)($prodRow[2] ?? 0);
+$huevosProducidos = $huevosViables; // Mantener compatibilidad
+$totalCosechado = $huevosViables + $huevosNoViables + $huevosMermas;
 
 // 3. Pedidos Completados (Pedidos entregados)
 $completadosRes = $conn->query("SELECT COUNT(*) FROM pedidos WHERE estado = 'entregado' AND DATE(fecha_pedido) BETWEEN '$fecha_inicio' AND '$fecha_fin'");
@@ -255,20 +260,35 @@ $produccion_mensual = [
     </div>
 
     <!-- Indicadores de Reportes -->
-    <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+    <div class="status-overviews" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
       <div class="background-border">
         <div class="container-5"><div class="text-wrapper-2">Ingresos Totales</div></div>
         <div class="div-2"><div class="text-wrapper-3">$<?php echo number_format($ingresosTotales, 2); ?></div></div>
       </div>
 
-      <div class="background-border-2" style="border-color: rgba(23, 106, 33, 0.25);">
-        <div class="container-5"><div class="text-wrapper-2" style="color: #176a21;">Huevos Producidos</div></div>
-        <div class="div-2"><div class="text-wrapper-3" style="color: #176a21;"><?php echo number_format($huevosProducidos); ?> ud</div></div>
-      </div>
-
       <div class="background-border-3">
         <div class="container-5"><div class="text-wrapper-2">Pedidos Completados</div></div>
         <div class="div-2"><div class="text-wrapper-3"><?php echo $pedidosCompletados; ?> pedidos</div></div>
+      </div>
+
+      <div class="background-border-2" style="border-color: rgba(23, 106, 33, 0.4);">
+        <div class="container-5"><div class="text-wrapper-2" style="color: #176a21;">Total Cosechado</div></div>
+        <div class="div-2"><div class="text-wrapper-3" style="color: #176a21;"><?php echo number_format($totalCosechado); ?> ud</div></div>
+      </div>
+
+      <div class="background-border-2" style="border-color: rgba(23, 106, 33, 0.2);">
+        <div class="container-5"><div class="text-wrapper-2" style="color: #176a21; font-size:11px;">Viables para Venta</div></div>
+        <div class="div-2"><div class="text-wrapper-3" style="color: #176a21; font-size:24px;"><?php echo number_format($huevosViables); ?> ud</div></div>
+      </div>
+
+      <div class="background-border-2" style="border-color: rgba(255, 138, 0, 0.3);">
+        <div class="container-5"><div class="text-wrapper-2" style="color: #ff8a00; font-size:11px;">No Viables (Pigmentación)</div></div>
+        <div class="div-2"><div class="text-wrapper-3" style="color: #ff8a00; font-size:24px;"><?php echo number_format($huevosNoViables); ?> ud</div></div>
+      </div>
+
+      <div class="background-border-2" style="border-color: rgba(176, 37, 0, 0.3);">
+        <div class="container-5"><div class="text-wrapper-2" style="color: #b02500; font-size:11px;">Mermas (Rotos / Dañados)</div></div>
+        <div class="div-2"><div class="text-wrapper-3" style="color: #b02500; font-size:24px;"><?php echo number_format($huevosMermas); ?> ud</div></div>
       </div>
     </div>
 

@@ -269,10 +269,9 @@ $countList = $resultList ? $resultList->num_rows : 0;
         <div class="form-group">
           <label class="form-label">Presentación / Tamaño *</label>
           <select name="tamano" class="form-select">
-            <option value="Extra (XL)" selected>Extra (XL)</option>
-            <option value="Grande (L)">Grande (L)</option>
-            <option value="Medio (M)">Medio (M)</option>
-            <option value="Pequeño (S)">Pequeño (S)</option>
+            <option value="Chico (Menos de 56g)">Chico (Menos de 56g)</option>
+            <option value="Mediano (56g a 70g)" selected>Mediano (56g a 70g)</option>
+            <option value="Jumbo (Más de 70g)">Jumbo (Más de 70g)</option>
           </select>
         </div>
       </div>
@@ -323,10 +322,9 @@ $countList = $resultList ? $resultList->num_rows : 0;
         <div class="form-group">
           <label class="form-label">Presentación / Tamaño *</label>
           <select name="tamano" id="edit_tamano" class="form-select">
-            <option value="Extra (XL)">Extra (XL)</option>
-            <option value="Grande (L)">Grande (L)</option>
-            <option value="Medio (M)">Medio (M)</option>
-            <option value="Pequeño (S)">Pequeño (S)</option>
+            <option value="Chico (Menos de 56g)">Chico (Menos de 56g)</option>
+            <option value="Mediano (56g a 70g)">Mediano (56g a 70g)</option>
+            <option value="Jumbo (Más de 70g)">Jumbo (Más de 70g)</option>
           </select>
         </div>
       </div>

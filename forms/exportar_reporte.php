@@ -72,11 +72,15 @@ if ($tipo_reporte === "ventas") {
 
 } elseif ($tipo_reporte === "produccion") {
     $titulo_reporte = "Reporte General de Producción";
-    $columnas = ["ID Registro", "Fecha", "Granja", "Cantidad (uds)", "Tipo Huevo", "Detalle"];
+    $columnas = ["ID Registro", "Fecha", "Granja", "Huevos Viables", "No Viables", "Merma", "Total Recolectado", "Tamaño", "Tipo Huevo", "Observaciones"];
     
-    $sql = "SELECT pr.id, pr.fecha_produccion, COALESCE(g.nombre, 'Almacén Central') AS granja, pr.cantidad, pr.tipo_huevo, pr.detalle 
+    $sql = "SELECT pr.id, pr.fecha_produccion, COALESCE(g.nombre, 'Almacén Central') AS granja, 
+                   pr.cantidad AS viables, pr.no_viable, pr.merma,
+                   (pr.cantidad + pr.no_viable + pr.merma) AS total_recolectado,
+                   prod.tipo_huevo, prod.tamano, pr.observaciones
             FROM produccion pr 
             LEFT JOIN granjas g ON pr.granja_id = g.id 
+            LEFT JOIN productos prod ON pr.producto_id = prod.id
             WHERE pr.fecha_produccion BETWEEN ? AND ? 
             ORDER BY pr.id DESC";
     $stmt = $conn->prepare($sql);
@@ -88,20 +92,29 @@ if ($tipo_reporte === "ventas") {
             "ID Registro" => "#PRD-" . str_pad($row["id"], 3, "0", STR_PAD_LEFT),
             "Fecha" => date("d/m/Y", strtotime($row["fecha_produccion"])),
             "Granja" => $row["granja"],
-            "Cantidad (uds)" => $row["cantidad"] . " uds",
-            "Tipo Huevo" => ucfirst($row["tipo_huevo"]),
-            "Detalle" => $row["detalle"] ?? "Sin observaciones"
+            "Huevos Viables" => $row["viables"] . " uds",
+            "No Viables" => $row["no_viable"] . " uds",
+            "Merma" => $row["merma"] . " uds",
+            "Total Recolectado" => $row["total_recolectado"] . " uds",
+            "Tamaño" => $row["tamano"] ?? "N/A",
+            "Tipo Huevo" => ucfirst($row["tipo_huevo"] ?? "N/A"),
+            "Observaciones" => $row["observaciones"] ?? "Sin observaciones"
         ];
     }
 
 } elseif ($tipo_reporte === "inventario") {
     $titulo_reporte = "Trazabilidad e Inventario de Huevos";
-    $columnas = ["ID Lote", "Código Lote", "Granja", "Producto", "Stock Actual", "Fecha Postura", "Fecha Vencimiento", "Estado"];
+    $columnas = ["ID Lote", "Código Lote", "Granja", "Tipo Huevo", "Tamaño", "Stock Actual (Viables)", "No Viables", "Merma", "Total Cosechado", "Fecha Postura", "Fecha Vencimiento", "Estado"];
     
-    $sql = "SELECT inv.id, inv.codigo_lote, COALESCE(g.nombre, 'Externo') AS granja, p.nombre AS producto, inv.cantidad, inv.fecha_postura, inv.fecha_caducidad, inv.estado 
+    $sql = "SELECT inv.id, inv.codigo_lote, COALESCE(g.nombre, 'Externo') AS granja, 
+                   p.tipo_huevo, p.tamano, inv.cantidad, 
+                   COALESCE(prod.no_viable, 0) as no_viable,
+                   COALESCE(prod.merma, 0) as merma,
+                   inv.fecha_postura, inv.fecha_caducidad, inv.estado 
             FROM inventario_huevos inv 
             LEFT JOIN granjas g ON inv.granja_id = g.id 
             LEFT JOIN productos p ON inv.producto_id = p.id 
+            LEFT JOIN produccion prod ON inv.codigo_lote = prod.codigo_lote
             WHERE inv.fecha_postura BETWEEN ? AND ? 
             ORDER BY inv.id DESC";
     $stmt = $conn->prepare($sql);
@@ -113,8 +126,12 @@ if ($tipo_reporte === "ventas") {
             "ID Lote" => "#LOT-" . str_pad($row["id"], 3, "0", STR_PAD_LEFT),
             "Código Lote" => $row["codigo_lote"],
             "Granja" => $row["granja"],
-            "Producto" => $row["producto"] ?? "Desconocido",
-            "Stock Actual" => $row["cantidad"] . " uds",
+            "Tipo Huevo" => $row["tipo_huevo"] ?? "N/A",
+            "Tamaño" => $row["tamano"] ?? "N/A",
+            "Stock Actual (Viables)" => $row["cantidad"] . " uds",
+            "No Viables" => $row["no_viable"] . " uds",
+            "Merma" => $row["merma"] . " uds",
+            "Total Cosechado" => ($row["cantidad"] + $row["no_viable"] + $row["merma"]) . " uds",
             "Fecha Postura" => date("d/m/Y", strtotime($row["fecha_postura"])),
             "Fecha Vencimiento" => date("d/m/Y", strtotime($row["fecha_caducidad"])),
             "Estado" => strtoupper($row["estado"])

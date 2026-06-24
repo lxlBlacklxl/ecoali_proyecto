@@ -34,11 +34,14 @@ $fechaLimite = date('Y-m-d', strtotime('+1 day')); // Próximo a caducar en 1 d�
 // 3. OBTENER MÉTRICAS DEL PROVEEDOR
 
 // A. Total huevos producidos (Historial total)
-$stmtProd = $conn->prepare("SELECT SUM(cantidad) FROM produccion WHERE proveedor_id = ?");
+$stmtProd = $conn->prepare("SELECT SUM(cantidad), SUM(no_viable), SUM(merma) FROM produccion WHERE proveedor_id = ?");
 $stmtProd->bind_param("i", $proveedor_id);
 $stmtProd->execute();
 $resProd = $stmtProd->get_result();
-$huevosProducidos = (int)($resProd->fetch_row()[0] ?? 0);
+$prodRow = $resProd->fetch_row();
+$huevosProducidos = (int)($prodRow[0] ?? 0);
+$huevosNoViables = (int)($prodRow[1] ?? 0);
+$huevosMermas = (int)($prodRow[2] ?? 0);
 $stmtProd->close();
 
 // B. Total huevos disponibles (Stock actual en lotes activos/próximos)
@@ -259,6 +262,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
       <div class="metric-card success">
         <span class="label">Huevos Recolectados 🥚</span>
         <span class="value"><?php echo number_format($huevosProducidos); ?> ud</span>
+      </div>
+      <div class="metric-card warn">
+        <span class="label">No Viables (Pigmentación) 🎨</span>
+        <span class="value"><?php echo number_format($huevosNoViables); ?> ud</span>
+      </div>
+      <div class="metric-card danger">
+        <span class="label">Mermas (Rotos / Dañados) 🩹</span>
+        <span class="value"><?php echo number_format($huevosMermas); ?> ud</span>
       </div>
       <div class="metric-card success">
         <span class="label">Listos en Almacén 🧺</span>

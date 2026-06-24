@@ -30,12 +30,14 @@ $nombre_empresa = $provRow["nombre_empresa"];
 $stmtProv->close();
 
 
-// 3. CONSULTAR MÉTRICAS DE REPORTES
-// A. Huevos registrados (Total histórico producido)
-$stmtH1 = $conn->prepare("SELECT COALESCE(SUM(cantidad), 0) FROM produccion WHERE proveedor_id = ?");
+// A. Huevos registrados (Total histórico producido, no viables y mermas)
+$stmtH1 = $conn->prepare("SELECT COALESCE(SUM(cantidad), 0), COALESCE(SUM(no_viable), 0), COALESCE(SUM(merma), 0) FROM produccion WHERE proveedor_id = ?");
 $stmtH1->bind_param("i", $proveedor_id);
 $stmtH1->execute();
-$huevosRegistrados = (int)$stmtH1->get_result()->fetch_row()[0];
+$resH1 = $stmtH1->get_result()->fetch_row();
+$huevosRegistrados = (int)$resH1[0];
+$huevosNoViables = (int)$resH1[1];
+$huevosMermas = (int)$resH1[2];
 $stmtH1->close();
 
 // B. Huevos disponibles (Stock actual listo)
@@ -258,6 +260,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <span class="label">Huevos Cosechados 🥚</span>
         <span class="value"><?php echo number_format($huevosRegistrados); ?> ud</span>
       </div>
+      <div class="metric-card warn">
+        <span class="label">No Viables (Pigmentación) 🎨</span>
+        <span class="value"><?php echo number_format($huevosNoViables); ?> ud</span>
+      </div>
+      <div class="metric-card danger">
+        <span class="label">Mermas (Rotos / Dañados) 🩹</span>
+        <span class="value"><?php echo number_format($huevosMermas); ?> ud</span>
+      </div>
       <div class="metric-card success">
         <span class="label">Listos en Almacén 🧺</span>
         <span class="value"><?php echo number_format($huevosDisponibles); ?> ud</span>
@@ -363,6 +373,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
               <td><?php echo $lotesActivos; ?> lotes</td>
               <td><strong style="color:var(--secondary);"><?php echo number_format($huevosDisponibles); ?> ud</strong></td>
               <td>Huevo disponible en sus granjas esperando logística.</td>
+            </tr>
+            <tr>
+              <td><strong>Huevos No Viables (Pigmentación Irregular)</strong></td>
+              <td>-</td>
+              <td><strong style="color:#ff8a00;"><?php echo number_format($huevosNoViables); ?> ud</strong></td>
+              <td>Huevos descartados por anomalías visuales en cáscara.</td>
+            </tr>
+            <tr>
+              <td><strong>Mermas de Producción (Rotos / Dañados)</strong></td>
+              <td>-</td>
+              <td><strong style="color:#b02500;"><?php echo number_format($huevosMermas); ?> ud</strong></td>
+              <td>Huevos rotos o dañados durante la recolección física.</td>
             </tr>
             <tr>
               <td><strong>Lotes Caducados / Vencidos</strong></td>

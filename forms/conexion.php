@@ -225,6 +225,54 @@ if ($resPromoCheck && (int)$resPromoCheck->fetch_row()[0] === 0) {
     ");
 }
 
+// 9.8.2 MIGRACIÓN AUTOMÁTICA: ESTABLECER CLAVES FORÁNEAS (INTEGRIDAD REFERENCIAL DE BASE DE DATOS)
+$resFKCheck = $conn->query("SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = '$bd' AND CONSTRAINT_NAME = 'fk_pedidos_cliente'");
+if ($resFKCheck && $resFKCheck->num_rows === 0) {
+    // Obtener primer ID administrador como fallback para registros huérfanos
+    $adminIdRes = $conn->query("SELECT id FROM usuarios WHERE rol_id = 1 LIMIT 1");
+    $firstAdminId = 4; // Default fallback
+    if ($adminIdRes && $adminIdRes->num_rows > 0) {
+        $firstAdminId = (int)$adminIdRes->fetch_row()[0];
+    }
+
+    // 1. Limpieza de datos huérfanos antes de aplicar las llaves foráneas
+    $conn->query("DELETE FROM pedidos WHERE cliente_id NOT IN (SELECT id FROM usuarios)");
+    $conn->query("UPDATE pedidos SET repartidor_id = NULL WHERE repartidor_id IS NOT NULL AND repartidor_id NOT IN (SELECT id FROM usuarios)");
+    
+    $conn->query("DELETE FROM incidencias WHERE pedido_id NOT IN (SELECT id FROM pedidos)");
+    $conn->query("DELETE FROM incidencias WHERE repartidor_id NOT IN (SELECT id FROM usuarios)");
+    
+    $conn->query("DELETE FROM regalias WHERE usuario_beneficiado_id NOT IN (SELECT id FROM usuarios)");
+    $conn->query("DELETE FROM regalias WHERE usuario_referido_id NOT IN (SELECT id FROM usuarios)");
+    $conn->query("UPDATE regalias SET pedido_id = NULL WHERE pedido_id IS NOT NULL AND pedido_id NOT IN (SELECT id FROM pedidos)");
+    
+    $conn->query("UPDATE bitacora SET usuario_id = $firstAdminId WHERE usuario_id NOT IN (SELECT id FROM usuarios)");
+    
+    $conn->query("DELETE FROM entregas_cedis WHERE cedis_id NOT IN (SELECT id FROM cedis)");
+    $conn->query("UPDATE entregas_cedis SET repartidor_id = NULL WHERE repartidor_id IS NOT NULL AND repartidor_id NOT IN (SELECT id FROM usuarios)");
+    
+    $conn->query("DELETE FROM proveedores WHERE usuario_id NOT IN (SELECT id FROM usuarios)");
+
+    // 2. Aplicar ALTER TABLE para agregar claves foráneas (Constraints)
+    $conn->query("ALTER TABLE pedidos ADD CONSTRAINT fk_pedidos_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+    $conn->query("ALTER TABLE pedidos ADD CONSTRAINT fk_pedidos_repartidor FOREIGN KEY (repartidor_id) REFERENCES usuarios(id) ON DELETE SET NULL");
+    
+    $conn->query("ALTER TABLE incidencias ADD CONSTRAINT fk_incidencias_pedido FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE");
+    $conn->query("ALTER TABLE incidencias ADD CONSTRAINT fk_incidencias_repartidor FOREIGN KEY (repartidor_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+    
+    $conn->query("ALTER TABLE regalias ADD CONSTRAINT fk_regalias_beneficiado FOREIGN KEY (usuario_beneficiado_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+    $conn->query("ALTER TABLE regalias ADD CONSTRAINT fk_regalias_referido FOREIGN KEY (usuario_referido_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+    $conn->query("ALTER TABLE regalias ADD CONSTRAINT fk_regalias_pedido FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE SET NULL");
+    
+    $conn->query("ALTER TABLE bitacora ADD CONSTRAINT fk_bitacora_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+    
+    $conn->query("ALTER TABLE entregas_cedis ADD CONSTRAINT fk_entregas_cedis_cedis FOREIGN KEY (cedis_id) REFERENCES cedis(id) ON DELETE CASCADE");
+    $conn->query("ALTER TABLE entregas_cedis ADD CONSTRAINT fk_entregas_cedis_repartidor FOREIGN KEY (repartidor_id) REFERENCES usuarios(id) ON DELETE SET NULL");
+    
+    $conn->query("ALTER TABLE proveedores ADD CONSTRAINT fk_proveedores_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+}
+
+
 /**
  * Función global de captura de auditoría para el Sistema de Auditoría y Bitácoras (Requisito #25).
  * Registra de manera unificada cualquier acción de precio, cancelaciones y movimientos de inventario.
@@ -282,5 +330,31 @@ if ($stmtCaducador && $stmtCaducador->num_rows > 0) {
             "El sistema detectó que el lote '$lote_code' superó los 3 días de antigüedad desde su postura y fue bloqueado automáticamente para la venta."
         );
     }
+}
+
+// 9.9.2 MIGRACIÓN AUTOMÁTICA: ACTUALIZACIÓN DE CLASIFICACIÓN DE TAMAÑOS DE HUEVOS POR PESO
+// Chico: menos de 56g, Mediano: 56g a 70g, Jumbo: más de 70g
+$conn->query("UPDATE productos SET tamano = 'Chico (Menos de 56g)' WHERE tamano LIKE '%Pequeño%' OR tamano LIKE '%Chico%' OR tamano = 'S'");
+$conn->query("UPDATE productos SET tamano = 'Mediano (56g a 70g)' WHERE tamano LIKE '%Medio%' OR tamano LIKE '%Mediano%' OR tamano = 'M'");
+$conn->query("UPDATE productos SET tamano = 'Jumbo (Más de 70g)' WHERE tamano LIKE '%Grande%' OR tamano LIKE '%Extra%' OR tamano LIKE '%Jumbo%' OR tamano = 'L' OR tamano = 'XL'");
+
+// 9.9.3 MIGRACIÓN AUTOMÁTICA: AGREGAR no_viable Y merma A LA TABLA produccion
+$resColNoViable = $conn->query("SHOW COLUMNS FROM `produccion` LIKE 'no_viable'");
+if ($resColNoViable && $resColNoViable->num_rows === 0) {
+    $conn->query("ALTER TABLE `produccion` ADD COLUMN `no_viable` INT NOT NULL DEFAULT 0");
+}
+$resColMerma = $conn->query("SHOW COLUMNS FROM `produccion` LIKE 'merma'");
+if ($resColMerma && $resColMerma->num_rows === 0) {
+    $conn->query("ALTER TABLE `produccion` ADD COLUMN `merma` INT NOT NULL DEFAULT 0");
+}
+
+// 9.9.4 MIGRACIÓN AUTOMÁTICA: AGREGAR no_viable Y merma A LA TABLA inventario_huevos
+$resColInvNoViable = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'no_viable'");
+if ($resColInvNoViable && $resColInvNoViable->num_rows === 0) {
+    $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `no_viable` INT NOT NULL DEFAULT 0");
+}
+$resColInvMerma = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'merma'");
+if ($resColInvMerma && $resColInvMerma->num_rows === 0) {
+    $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `merma` INT NOT NULL DEFAULT 0");
 }
 ?>
