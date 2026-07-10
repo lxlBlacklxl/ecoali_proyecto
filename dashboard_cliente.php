@@ -68,7 +68,7 @@ if (!empty($direccion)) {
 }
 
 // 2. Obtener productos activos de la BD con stock disponible real-time (Requirement 1)
-$productosRes = $conn->query("SELECT p.*, COALESCE(SUM(i.cantidad), 0) AS stock_total 
+$productosRes = $conn->query("SELECT p.*, FLOOR(COALESCE(SUM(i.cantidad), 0) / 30) AS stock_total 
                              FROM productos p 
                              LEFT JOIN inventario_huevos i ON p.id = i.producto_id AND i.estado IN ('disponible', 'bajo_stock') AND i.cantidad > 0
                              WHERE p.activo = 1 
@@ -981,7 +981,7 @@ if (!empty($pedidos)) {
                 <div style="margin-top:auto; display:flex; justify-content:space-between; align-items:center;">
                   <div>
                     <span style="font-size:24px; font-weight:800; color:var(--secondary);">$<?php echo number_format($p["precio"], 2); ?></span>
-                    <small style="display:block; font-size:10px; color:var(--text-medium); font-weight:700;"><?php echo $stockTotal > 0 ? "Stock: $stockTotal ud" : "Agotado"; ?></small>
+                    <small style="display:block; font-size:10px; color:var(--text-medium); font-weight:700;"><?php echo $stockTotal > 0 ? "Stock: $stockTotal cartones" : "Agotado"; ?></small>
                   </div>
 
                   <?php if ($stockTotal > 0): ?>
@@ -1130,7 +1130,7 @@ if (!empty($pedidos)) {
                     <?php foreach ($ped["items"] as $it): ?>
                       <tr style="border-bottom:1px solid rgba(213,164,112,0.05);">
                         <td style="padding:12px 10px; font-size:13px; font-weight:600;"><?php echo htmlspecialchars($it["producto_nombre"]); ?> <small>(<?php echo htmlspecialchars($it["tipo_huevo"] . ' - ' . $it["tamano"]); ?>)</small></td>
-                        <td style="padding:12px 10px; font-size:13px; font-weight:600;"><?php echo $it["cantidad"]; ?> ud</td>
+                        <td style="padding:12px 10px; font-size:13px; font-weight:600;"><?php echo $it["cantidad"]; ?> cartón(es)</td>
                         <td style="padding:12px 10px; font-size:13px; font-weight:600;">$<?php echo number_format($it["precio_unitario"], 2); ?></td>
                         <td style="padding:12px 10px; font-size:13px; font-weight:800; color:var(--secondary);">$<?php echo number_format($it["subtotal"], 2); ?></td>
                       </tr>
@@ -1963,7 +1963,7 @@ if (!empty($pedidos)) {
           const next = item.cantidad + change;
           if (next > item.maxStock) {
               item.cantidad = item.maxStock;
-              alert('Límite de stock disponible alcanzado (' + item.maxStock + ' ud).');
+              alert('Límite de stock disponible alcanzado (' + item.maxStock + ' cartones).');
           } else if (next <= 0) {
               ecoaliCart = ecoaliCart.filter(it => it.producto_id !== id);
           } else {
@@ -1981,7 +1981,7 @@ if (!empty($pedidos)) {
       if (isNaN(val) || val < 1) val = 1;
       if (val > maxStock) {
           val = maxStock;
-          alert('Límite de stock disponible alcanzado (' + maxStock + ' ud).');
+          alert('Límite de stock disponible alcanzado (' + maxStock + ' cartones).');
       }
       item.cantidad = val;
       saveCart();

@@ -12,7 +12,7 @@
 // 1. CONFIGURACIÓN DE PARÁMETROS DEL SERVIDOR DE BASE DE DATOS
 $host = "127.0.0.1";
 $usuario = "root";
-$password = "";
+$password = "Ecoali123!";
 $bd = "ecoali";
 
 // 2. CREACIÓN DE LA INSTANCIA DE CONEXIÓN CON MYSQLI

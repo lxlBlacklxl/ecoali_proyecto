@@ -556,7 +556,7 @@ session_start();
 
     <div style="width: 100%; display: flex; justify-content: center; overflow: hidden; margin-top: 5px;">
       <div id="g_id_onload"
-           data-client_id="137822436644-08aukfg18do9q93idftfe52769fq8lk7.apps.googleusercontent.com"
+           data-client_id="610699907925-hja68acvk7ks5fiqeunsuso93vtg49gh.apps.googleusercontent.com"
            data-context="signin"
            data-ux_mode="popup"
            data-callback="manejarAutenticacionGoogle"

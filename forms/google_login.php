@@ -15,7 +15,7 @@ if (empty($credential)) {
 }
 
 $client = new Client([
-    "client_id" => "137822436644-08aukfg18do9q93idftfe52769fq8lk7.apps.googleusercontent.com"
+    "client_id" => "610699907925-hja68acvk7ks5fiqeunsuso93vtg49gh.apps.googleusercontent.com"
 ]);
 
 $payload = $client->verifyIdToken($credential);

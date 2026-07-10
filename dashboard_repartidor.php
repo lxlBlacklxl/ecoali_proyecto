@@ -38,11 +38,11 @@ $direccion = $profile["direccion"] ?? "Almacén Central EcoAli";
 $telefono = $profile["telefono"] ?? "";
 
 // 2. Métricas de Reparto
-$stmtComp = $conn->prepare("SELECT COUNT(*) FROM pedidos WHERE repartidor_id = ? AND estado = 'entregado'");
+$stmtComp = $conn->prepare("SELECT COUNT(*) FROM pedidos WHERE repartidor_id = ? AND estado = 'entregado' AND DATE(fecha_entrega) = CURDATE()");
 $stmtComp->bind_param("i", $repartidor_id);
 $stmtComp->execute();
 $resComp = $stmtComp->get_result();
-$entregasCompletadas = (int)($resComp->fetch_row()[0] ?? 0);
+$entregasCompletadasHoy = (int)($resComp->fetch_row()[0] ?? 0);
 
 $stmtRuta = $conn->prepare("SELECT COUNT(*) FROM pedidos WHERE repartidor_id = ? AND estado = 'en_ruta'");
 $stmtRuta->bind_param("i", $repartidor_id);
@@ -73,6 +73,15 @@ $paradasActivas = [];
 while ($row = $resRutas->fetch_assoc()) {
     $paradasActivas[] = $row;
 }
+
+// Etiquetas claras para mostrar los estados sin modificar los valores guardados en MySQL.
+$estadoEtiquetas = [
+    "pendiente" => "Por recoger",
+    "preparado" => "Por recoger",
+    "en_ruta" => "En ruta",
+    "entregado" => "Entregado",
+    "cancelado" => "Cancelado"
+];
 
 // 4. Obtener Historial de Entregas Completadas por el Chofer (con Firma y GPS)
 $histQuery = "SELECT p.id, p.total, p.fecha_pedido, p.fecha_entrega, p.coordenadas_entrega, p.firma_entrega, p.metodo_pago, up.direccion AS pedido_direccion, 
@@ -351,6 +360,101 @@ while ($row = $resHist->fetch_assoc()) {
     .metric-card.completadas { border-color: rgba(23, 106, 33, 0.35); background: rgba(23, 106, 33, 0.02); }
     .metric-card.completadas .value { color: var(--secondary); }
 
+    /* Herramientas de búsqueda y filtrado de la hoja de ruta */
+    .route-tools {
+      background: white;
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: var(--shadow-premium);
+      padding: 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .route-search {
+      flex: 1 1 320px;
+      position: relative;
+    }
+
+    .route-search input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1.5px solid var(--glass-border);
+      border-radius: 13px;
+      padding: 12px 16px 12px 42px;
+      font-family: 'Manrope', sans-serif;
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--text-dark);
+      background: #fffdfb;
+      outline: none;
+      transition: var(--transition-fast);
+    }
+
+    .route-search input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.1);
+    }
+
+    .route-search .search-icon {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .route-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .route-filter-btn {
+      border: 1.5px solid var(--glass-border);
+      background: white;
+      color: var(--text-medium);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-family: 'Manrope', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .route-filter-btn:hover,
+    .route-filter-btn.active {
+      border-color: var(--primary);
+      background: rgba(255, 138, 0, 0.1);
+      color: var(--primary-hover);
+    }
+
+    .route-results-count {
+      width: 100%;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-medium);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .route-empty-filter {
+      display: none;
+      text-align: center;
+      padding: 38px 24px;
+      background: white;
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      color: var(--text-medium);
+      font-weight: 700;
+    }
+
     /* Interactive Delivery Map */
     .routing-map-card {
       background: white;
@@ -499,9 +603,16 @@ while ($row = $resHist->fetch_assoc()) {
       gap: 8px;
     }
 
-    .action-btn:hover {
+    .action-btn:hover:not(:disabled) {
       background: var(--primary-hover);
       transform: scale(1.02);
+    }
+
+    .action-btn:disabled {
+      opacity: .65;
+      cursor: wait;
+      transform: none;
+      box-shadow: none;
     }
 
     .action-btn.deliver {
@@ -791,6 +902,9 @@ while ($row = $resHist->fetch_assoc()) {
         justify-content: center;
       }
       .form-grid { grid-template-columns: 1fr; }
+      .route-tools { align-items: stretch; }
+      .route-search, .route-filters { width: 100%; }
+      .route-filter-btn { flex: 1; }
     }
 
     /* Opaque white background override for History Detail Modal & Alert Modal */
@@ -856,6 +970,199 @@ while ($row = $resHist->fetch_assoc()) {
     opacity: .35;
     cursor: not-allowed;
   }
+.route-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(24, 20, 16, 0.62);
+    backdrop-filter: blur(5px);
+}
+
+.route-confirm-overlay.active {
+    display: flex;
+    animation: routeOverlayFade 0.2s ease;
+}
+
+.route-confirm-card {
+    position: relative;
+    width: min(440px, 100%);
+    padding: 34px;
+    overflow: hidden;
+    text-align: center;
+    background: #fffdfa;
+    border: 1px solid #f2d7bb;
+    border-radius: 28px;
+    box-shadow: 0 25px 70px rgba(60, 35, 10, 0.28);
+    animation: routeCardShow 0.25s ease;
+}
+
+.route-confirm-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 7px;
+    background: linear-gradient(90deg, #ff8a00, #ffb347);
+}
+
+.route-confirm-close {
+    position: absolute;
+    top: 15px;
+    right: 17px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    color: #745842;
+    font-size: 25px;
+    line-height: 1;
+    cursor: pointer;
+    background: #f7ede3;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.route-confirm-close:hover {
+    background: #f2dfcd;
+    transform: rotate(90deg);
+}
+
+.route-confirm-icon {
+    display: grid;
+    place-items: center;
+    width: 78px;
+    height: 78px;
+    margin: 5px auto 17px;
+    border-radius: 24px;
+    font-size: 38px;
+    background: linear-gradient(145deg, #fff0d9, #ffd09a);
+    box-shadow: 0 12px 28px rgba(255, 138, 0, 0.2);
+}
+
+.route-confirm-label {
+    display: inline-block;
+    margin-bottom: 12px;
+    padding: 7px 14px;
+    color: #bc6100;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    background: #fff0df;
+    border-radius: 999px;
+}
+
+.route-confirm-card h2 {
+    margin: 0 0 12px;
+    color: #33271c;
+    font-size: 27px;
+}
+
+.route-confirm-text {
+    margin: 0;
+    color: #746252;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.route-confirm-text strong {
+    color: #e87500;
+}
+
+.route-confirm-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 23px 0;
+    padding: 15px;
+    text-align: left;
+    color: #665241;
+    background: #fff7ed;
+    border: 1px solid #f6dcc0;
+    border-radius: 17px;
+}
+
+.route-confirm-info span {
+    font-size: 22px;
+}
+
+.route-confirm-info p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.route-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.35fr;
+    gap: 12px;
+}
+
+.route-confirm-btn {
+    min-height: 50px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.route-confirm-btn:hover {
+    transform: translateY(-2px);
+}
+
+.route-confirm-btn.secondary {
+    color: #664e3a;
+    background: #f4ece4;
+}
+
+.route-confirm-btn.primary {
+    color: white;
+    background: linear-gradient(135deg, #ef7d00, #ff9f1c);
+    box-shadow: 0 10px 24px rgba(239, 125, 0, 0.27);
+}
+
+@keyframes routeOverlayFade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes routeCardShow {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 520px) {
+    .route-confirm-card {
+        padding: 30px 22px 22px;
+        border-radius: 22px;
+    }
+
+    .route-confirm-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
 </style>
 </head>
 <body>
@@ -911,17 +1218,17 @@ while ($row = $resHist->fetch_assoc()) {
     <!-- PESTAÑA: DASHBOARD -->
     <section id="tab-dashboard" class="tab-pane active">
       <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="label">Pedidos por Recoger</span>
+          <span class="value"><?php echo $entregasPreparadas; ?> órdenes</span>
+        </div>
         <div class="metric-card active-delivery">
           <span class="label">Entregas en Tránsito</span>
           <span class="value"><?php echo $entregasEnRuta; ?> pedidos</span>
         </div>
         <div class="metric-card completadas">
-          <span class="label">Entregas Completadas</span>
-          <span class="value"><?php echo $entregasCompletadas; ?> envíos</span>
-        </div>
-        <div class="metric-card">
-          <span class="label">Pedidos por Recoger</span>
-          <span class="value"><?php echo $entregasPreparadas; ?> órdenes</span>
+          <span class="label">Entregadas Hoy</span>
+          <span class="value"><?php echo $entregasCompletadasHoy; ?> envíos</span>
         </div>
       </div>
 
@@ -962,14 +1269,49 @@ while ($row = $resHist->fetch_assoc()) {
         </div>
       </div>
       <?php endif; ?>
+
+      <?php if (!empty($paradasActivas)): ?>
+      <div class="route-tools" aria-label="Búsqueda y filtros de pedidos">
+        <label class="route-search" for="route-search-input">
+          <span class="search-icon">🔎</span>
+          <input
+            type="search"
+            id="route-search-input"
+            placeholder="Buscar por pedido, cliente o dirección..."
+            autocomplete="off"
+          >
+        </label>
+        <div class="route-filters" role="group" aria-label="Filtrar pedidos por estado">
+          <button type="button" class="route-filter-btn active" data-route-filter="all">Todos</button>
+          <button type="button" class="route-filter-btn" data-route-filter="por_recoger">Por recoger</button>
+          <button type="button" class="route-filter-btn" data-route-filter="en_ruta">En ruta</button>
+        </div>
+        <span class="route-results-count" id="route-results-count"><?php echo count($paradasActivas); ?> pedidos visibles</span>
+      </div>
+      <?php endif; ?>
+
       <div class="stops-container" id="stops-container">
         <?php if (!empty($paradasActivas)): ?>
           <?php 
           $idx = 1;
           foreach ($paradasActivas as $parada): 
             $est = strtolower($parada["estado"]);
+            $estadoVisible = $estadoEtiquetas[$est] ?? ucfirst(str_replace("_", " ", $est));
+            $estadoFiltro = in_array($est, ["pendiente", "preparado"], true) ? "por_recoger" : $est;
+            $textoBusqueda = implode(" ", [
+                "PED-" . str_pad($parada["id"], 3, "0", STR_PAD_LEFT),
+                $parada["cliente_nombre"] ?? "",
+                $parada["cliente_apellido"] ?? "",
+                $parada["pedido_direccion"] ?? ""
+            ]);
           ?>
-            <article class="stop-card <?php echo $est; ?>" id="stop-card-<?php echo $parada['id']; ?>" data-stop-index="<?php echo $idx - 1; ?>">
+            <article
+              class="stop-card <?php echo htmlspecialchars($est, ENT_QUOTES, 'UTF-8'); ?>"
+              id="stop-card-<?php echo (int)$parada['id']; ?>"
+              data-stop-index="<?php echo $idx - 1; ?>"
+              data-route-state="<?php echo htmlspecialchars($estadoFiltro, ENT_QUOTES, 'UTF-8'); ?>"
+              data-search="<?php echo htmlspecialchars($textoBusqueda, ENT_QUOTES, 'UTF-8'); ?>"
+            >
               <div class="stop-number">#<?php echo $idx++; ?></div>
               
               <div class="stop-details">
@@ -984,12 +1326,12 @@ while ($row = $resHist->fetch_assoc()) {
               </div>
 
               <div>
-                <span class="badge-status <?php echo $est; ?>"><?php echo $parada["estado"]; ?></span>
+                <span class="badge-status <?php echo htmlspecialchars($est, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($estadoVisible); ?></span>
               </div>
 
               <div>
                 <?php if ($est === "pendiente" || $est === "preparado"): ?>
-                  <button class="action-btn" onclick="updateDeliveryStatus(<?php echo $parada['id']; ?>, 'en_ruta')">
+                  <button class="action-btn" type="button" onclick="confirmStartRoute(<?php echo (int)$parada['id']; ?>, this)">
                     Iniciar Ruta ➤
                   </button>
                 <?php elseif ($est === "en_ruta"): ?>
@@ -999,8 +1341,8 @@ while ($row = $resHist->fetch_assoc()) {
                         Navegar 🧭
                       </button>
                     </a>
-                    <button class="action-btn deliver" onclick="openManageStopModal(<?php echo $parada['id']; ?>, '<?php echo htmlspecialchars($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido']); ?>', '<?php echo htmlspecialchars($parada['pedido_direccion']); ?>');">
-                      Gestionar ✓
+                    <button class="action-btn deliver" type="button" onclick="openManageStopModal(<?php echo (int)$parada['id']; ?>, <?php echo htmlspecialchars(json_encode($parada['cliente_nombre'] . ' ' . $parada['cliente_apellido'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode($parada['pedido_direccion'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>);">
+                      Completar entrega ✓
                     </button>
                   </div>
                 <?php endif; ?>
@@ -1014,9 +1356,13 @@ while ($row = $resHist->fetch_assoc()) {
         <?php endif; ?>
       </div>
 
+      <div class="route-empty-filter" id="route-empty-filter">
+        No se encontraron pedidos con la búsqueda o el filtro seleccionado.
+      </div>
+
       <!-- Paginación de paradas (3 por página) -->
-      <?php if (count($paradasActivas) > 3): ?>
-      <div class="stops-pagination" id="stops-pagination">
+      <?php if (!empty($paradasActivas)): ?>
+      <div class="stops-pagination" id="stops-pagination" <?php echo count($paradasActivas) > 3 ? '' : 'style="display:none;"'; ?>>
         <span class="pag-info" id="stops-pag-info">Parada 1–3 de <?php echo count($paradasActivas); ?></span>
         <div class="pag-btns" id="stops-pag-btns"></div>
       </div>
@@ -1310,25 +1656,66 @@ while ($row = $resHist->fetch_assoc()) {
 
 <script type="text/javascript" src="https://www.bing.com/api/maps/mapcontrol?callback=loadBingMap" async defer></script>
 <script>
-  // ── Paginación de Paradas (3 por página) ──
+  // ── Búsqueda, filtros y paginación de paradas (3 por página) ──
   const STOPS_POR_PAG = 3;
   let stopsPaginaActual = 1;
+  let routeSearchTerm = '';
+  let routeStateFilter = 'all';
+
+  function normalizeRouteText(value) {
+      return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+  }
+
+  function getFilteredStopCards() {
+      const cards = Array.from(document.querySelectorAll('#stops-container .stop-card'));
+
+      return cards.filter(card => {
+          const matchesText = normalizeRouteText(card.dataset.search).includes(routeSearchTerm);
+          const matchesState = routeStateFilter === 'all' || card.dataset.routeState === routeStateFilter;
+          return matchesText && matchesState;
+      });
+  }
 
   function renderStopsPagination() {
-      const cards   = document.querySelectorAll('#stops-container .stop-card');
-      const total   = cards.length;
-      if (total === 0) return;
+      const allCards = Array.from(document.querySelectorAll('#stops-container .stop-card'));
+      if (allCards.length === 0) return;
 
-      const totalPags = Math.ceil(total / STOPS_POR_PAG);
-      const inicio    = (stopsPaginaActual - 1) * STOPS_POR_PAG;
-      const fin       = inicio + STOPS_POR_PAG;
+      const filteredCards = getFilteredStopCards();
+      const total = filteredCards.length;
+      const totalPags = Math.max(1, Math.ceil(total / STOPS_POR_PAG));
+      stopsPaginaActual = Math.min(stopsPaginaActual, totalPags);
 
-      // Mostrar / ocultar tarjetas
-      cards.forEach((card, i) => {
+      allCards.forEach(card => { card.style.display = 'none'; });
+
+      const emptyEl = document.getElementById('route-empty-filter');
+      if (emptyEl) emptyEl.style.display = total === 0 ? 'block' : 'none';
+
+      const countEl = document.getElementById('route-results-count');
+      if (countEl) {
+          countEl.textContent = `${total} de ${allCards.length} pedidos visibles`;
+      }
+
+      const paginationEl = document.getElementById('stops-pagination');
+      if (paginationEl) {
+          paginationEl.style.display = total > STOPS_POR_PAG ? 'flex' : 'none';
+      }
+
+      if (total === 0) {
+          const btnsEl = document.getElementById('stops-pag-btns');
+          if (btnsEl) btnsEl.innerHTML = '';
+          return;
+      }
+
+      const inicio = (stopsPaginaActual - 1) * STOPS_POR_PAG;
+      const fin = inicio + STOPS_POR_PAG;
+      filteredCards.forEach((card, i) => {
           card.style.display = (i >= inicio && i < fin) ? '' : 'none';
       });
 
-      // Texto de info
       const infoEl = document.getElementById('stops-pag-info');
       if (infoEl) {
           const desde = Math.min(inicio + 1, total);
@@ -1336,20 +1723,17 @@ while ($row = $resHist->fetch_assoc()) {
           infoEl.textContent = `Parada ${desde}–${hasta} de ${total}`;
       }
 
-      // Render botones
       const btnsEl = document.getElementById('stops-pag-btns');
       if (!btnsEl) return;
       btnsEl.innerHTML = '';
 
-      // Botón Anterior
       const btnPrev = document.createElement('button');
       btnPrev.className = 'pag-btn';
       btnPrev.innerHTML = '← Anterior';
-      btnPrev.disabled  = stopsPaginaActual === 1;
-      btnPrev.onclick   = () => { stopsPaginaActual--; renderStopsPagination(); };
+      btnPrev.disabled = stopsPaginaActual === 1;
+      btnPrev.onclick = () => { stopsPaginaActual--; renderStopsPagination(); };
       btnsEl.appendChild(btnPrev);
 
-      // Botones numéricos
       for (let p = 1; p <= totalPags; p++) {
           const btn = document.createElement('button');
           btn.className = 'pag-btn' + (p === stopsPaginaActual ? ' active' : '');
@@ -1358,13 +1742,17 @@ while ($row = $resHist->fetch_assoc()) {
           btnsEl.appendChild(btn);
       }
 
-      // Botón Siguiente
       const btnNext = document.createElement('button');
       btnNext.className = 'pag-btn';
       btnNext.innerHTML = 'Siguiente →';
-      btnNext.disabled  = stopsPaginaActual === totalPags;
-      btnNext.onclick   = () => { stopsPaginaActual++; renderStopsPagination(); };
+      btnNext.disabled = stopsPaginaActual === totalPags;
+      btnNext.onclick = () => { stopsPaginaActual++; renderStopsPagination(); };
       btnsEl.appendChild(btnNext);
+  }
+
+  function applyRouteFilters() {
+      stopsPaginaActual = 1;
+      renderStopsPagination();
   }
 
   // Tab Switcher
@@ -1545,8 +1933,76 @@ while ($row = $resHist->fetch_assoc()) {
 
   // --- SUBMISSION LOGIC ---
 
+  let pendingRouteStart = null;
+
+function confirmStartRoute(id, triggerButton) {
+    const pedidoCodigo = `PED-${String(id).padStart(3, '0')}`;
+
+    pendingRouteStart = {
+        id,
+        triggerButton
+    };
+
+    document.getElementById('route-confirm-order').textContent =
+        pedidoCodigo;
+
+    document.getElementById('route-confirm-modal')
+        .classList.add('active');
+
+    document.body.style.overflow = 'hidden';
+}
+
+function closeStartRouteConfirm() {
+    document.getElementById('route-confirm-modal')
+        .classList.remove('active');
+
+    document.body.style.overflow = '';
+
+    pendingRouteStart = null;
+}
+
+function acceptStartRoute() {
+    if (!pendingRouteStart) {
+        return;
+    }
+
+    const { id, triggerButton } = pendingRouteStart;
+
+    document.getElementById('route-confirm-modal')
+        .classList.remove('active');
+
+    document.body.style.overflow = '';
+
+    pendingRouteStart = null;
+
+    updateDeliveryStatus(
+        id,
+        'en_ruta',
+        '',
+        '',
+        '',
+        triggerButton
+    );
+}
+
+  function setActionButtonLoading(button, loading, loadingText = 'Procesando...') {
+      if (!button) return;
+
+      if (loading) {
+          button.dataset.originalText = button.textContent.trim();
+          button.disabled = true;
+          button.textContent = loadingText;
+      } else {
+          button.disabled = false;
+          button.textContent = button.dataset.originalText || 'Iniciar Ruta ➤';
+      }
+  }
+
   // Actualizar estado simple (Recoger y Salir)
-  function updateDeliveryStatus(id, newStatus, coords = "", sign = "", photo = "") {
+  function updateDeliveryStatus(id, newStatus, coords = "", sign = "", photo = "", triggerButton = null) {
+      if (triggerButton?.disabled) return;
+      setActionButtonLoading(triggerButton, true, newStatus === 'en_ruta' ? 'Iniciando ruta...' : 'Procesando...');
+
       const payload = {
           pedido_id: id,
           nuevo_estado: newStatus,
@@ -1560,24 +2016,41 @@ while ($row = $resHist->fetch_assoc()) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
       })
-      .then(res => res.json())
+      .then(res => {
+          if (!res.ok) throw new Error(`Respuesta HTTP ${res.status}`);
+          return res.json();
+      })
       .then(data => {
           if (data.status === 'success') {
               closeManageStopModal();
-              showAlertModal(
-                  '¡Ruta Actualizada!',
-                  data.message,
-                  '✓',
-                  'var(--secondary)',
-                  true
-              );
+
+              const pedidoCodigo = `PED-${String(id).padStart(3, '0')}`;
+              const successCopy = {
+                  en_ruta: {
+                      title: '¡Ruta iniciada!',
+                      message: `El pedido ${pedidoCodigo} ya está en ruta. Ahora puedes abrir la navegación.`
+                  },
+                  entregado: {
+                      title: '¡Entrega registrada!',
+                      message: `La entrega del pedido ${pedidoCodigo} se guardó correctamente con su evidencia.`
+                  },
+                  cancelado: {
+                      title: 'Entrega cancelada',
+                      message: `El pedido ${pedidoCodigo} fue cancelado y el inventario se actualizó correctamente.`
+                  }
+              };
+              const copy = successCopy[newStatus] || { title: '¡Operación exitosa!', message: data.message };
+
+              showAlertModal(copy.title, copy.message, '✓', 'var(--secondary)', true);
           } else {
-              showAlertModal('Error', data.message, '✗', '#b02500');
+              setActionButtonLoading(triggerButton, false);
+              showAlertModal('No se pudo actualizar', data.message, '✗', '#b02500');
           }
       })
       .catch(err => {
           console.error(err);
-          showAlertModal('Error de Servidor', 'Ocurrió un error inesperado al actualizar.', '✗', '#b02500');
+          setActionButtonLoading(triggerButton, false);
+          showAlertModal('Error de servidor', 'Ocurrió un error inesperado al actualizar el pedido.', '✗', '#b02500');
       });
   }
 
@@ -1635,7 +2108,14 @@ while ($row = $resHist->fetch_assoc()) {
                   updateDeliveryStatus(activePedidoId, 'cancelado');
               } else {
                   closeManageStopModal();
-                  showAlertModal('Incidencia Reportada', data.message, '✓', 'var(--secondary)', true);
+                  const pedidoCodigo = `PED-${String(activePedidoId).padStart(3, '0')}`;
+                  showAlertModal(
+                      'Incidencia reportada',
+                      `La incidencia del pedido ${pedidoCodigo} se registró correctamente y el pedido continúa en ruta.`,
+                      '✓',
+                      'var(--secondary)',
+                      true
+                  );
               }
           } else {
               showAlertModal('Error', data.message, '✗', '#b02500');
@@ -1837,7 +2317,24 @@ while ($row = $resHist->fetch_assoc()) {
           });
       }
 
-      // Inicializar paginación de paradas al cargar la página
+      const searchInput = document.getElementById('route-search-input');
+      if (searchInput) {
+          searchInput.addEventListener('input', function() {
+              routeSearchTerm = normalizeRouteText(this.value);
+              applyRouteFilters();
+          });
+      }
+
+      document.querySelectorAll('.route-filter-btn').forEach(button => {
+          button.addEventListener('click', function() {
+              document.querySelectorAll('.route-filter-btn').forEach(btn => btn.classList.remove('active'));
+              this.classList.add('active');
+              routeStateFilter = this.dataset.routeFilter || 'all';
+              applyRouteFilters();
+          });
+      });
+
+      // Inicializar búsqueda, filtros y paginación de paradas al cargar la página.
       renderStopsPagination();
   });
 
@@ -1902,7 +2399,7 @@ while ($row = $resHist->fetch_assoc()) {
               // Infobox interactivo
               const infobox = new Microsoft.Maps.Infobox(stopLoc, {
                   title: `Parada #${idx + 1} - PED-${String(stop.id).padStart(3, '0')}`,
-                  description: `Cliente: ${stop.cliente_nombre} ${stop.cliente_apellido}\nDirección: ${stop.pedido_direccion}\nTeléfono: ${stop.cliente_telefono}\nEstado: ${stop.estado}`,
+                  description: `Cliente: ${stop.cliente_nombre} ${stop.cliente_apellido}\nDirección: ${stop.pedido_direccion}\nTeléfono: ${stop.cliente_telefono}\nEstado: ${stop.estado === 'en_ruta' ? 'En ruta' : 'Por recoger'}`,
                   visible: false
               });
               infobox.setMap(microsoftMapInstance);
@@ -1930,6 +2427,76 @@ while ($row = $resHist->fetch_assoc()) {
       }
   };
 </script>
+<div
+    id="route-confirm-modal"
+    class="route-confirm-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="route-confirm-title"
+    onclick="
+        if (event.target === this) {
+            closeStartRouteConfirm();
+        }
+    "
+>
+    <div class="route-confirm-card">
+
+        <button
+            type="button"
+            class="route-confirm-close"
+            onclick="closeStartRouteConfirm()"
+            aria-label="Cerrar"
+        >
+            ×
+        </button>
+
+        <div class="route-confirm-icon">
+            🚚
+        </div>
+
+        <span class="route-confirm-label">
+            Confirmar salida
+        </span>
+
+        <h2 id="route-confirm-title">
+            ¿Iniciar esta ruta?
+        </h2>
+
+        <p class="route-confirm-text">
+            Estás a punto de iniciar la entrega del pedido
+            <strong id="route-confirm-order">PED-000</strong>.
+        </p>
+
+        <div class="route-confirm-info">
+            <span>🧭</span>
+
+            <p>
+                El pedido cambiará al estado
+                <strong>En ruta</strong> y se habilitará
+                la opción para navegar hacia el destino.
+            </p>
+        </div>
+
+        <div class="route-confirm-actions">
+            <button
+                type="button"
+                class="route-confirm-btn secondary"
+                onclick="closeStartRouteConfirm()"
+            >
+                Cancelar
+            </button>
+
+            <button
+                type="button"
+                class="route-confirm-btn primary"
+                onclick="acceptStartRoute()"
+            >
+                Sí, iniciar ruta ➜
+            </button>
+        </div>
+
+    </div>
+</div>
 
 </body>
 </html>
