@@ -30,14 +30,25 @@ $activosUsuarios = $activosRes ? $activosRes->fetch_row()[0] : 0;
 $inactivosRes = $conn->query("SELECT COUNT(*) FROM usuarios WHERE activo = 0");
 $inactivosUsuarios = $inactivosRes ? $inactivosRes->fetch_row()[0] : 0;
 
-// Obtener todos los usuarios con su respectivo perfil
-$queryUsers = "SELECT u.id, u.usuario, u.rol_id, u.activo,
-                      up.nombre, up.apellido, up.email, up.telefono, up.direccion
+// Obtener todos los usuarios con su respectivo perfil y CEDIS
+$queryUsers = "SELECT u.id, u.usuario, u.rol_id, u.activo, u.cedis_id,
+                      up.nombre, up.apellido, up.email, up.telefono, up.direccion,
+                      c.nombre AS cedis_nombre
                FROM usuarios u
                LEFT JOIN usuario_perfil up ON u.id = up.usuario_id
+               LEFT JOIN cedis c ON u.cedis_id = c.id
                ORDER BY u.id DESC";
 $resultUsers = $conn->query($queryUsers);
 $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
+
+// Obtener los CEDIS activos para asociar al rol 5
+$cedisRes = $conn->query("SELECT id, nombre FROM cedis WHERE activo = 1 ORDER BY nombre ASC");
+$cedisList = [];
+if ($cedisRes) {
+    while ($cRow = $cedisRes->fetch_assoc()) {
+        $cedisList[] = $cRow;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -121,7 +132,8 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
           'logistica_admin.php' => 'Logística',
           'reportes_admin.php' => 'Reportes',
           'regalias_admin.php' => 'Regalías',
-          'bitacora_admin.php' => 'Bitácora'
+          'bitacora_admin.php' => 'Bitácora',
+          'cedis_admin.php' => 'CEDIS'
       ];
 
       foreach ($menu_items as $href => $label) {
@@ -192,6 +204,7 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
           <button class="div-wrapper" onclick="filtrarRol('2', this)"><div class="text-2">Cliente</div></button>
           <button class="div-wrapper" onclick="filtrarRol('3', this)"><div class="text-2">Proveedor</div></button>
           <button class="div-wrapper" onclick="filtrarRol('4', this)"><div class="text-2">Repartidor</div></button>
+          <button class="div-wrapper" onclick="filtrarRol('5', this)"><div class="text-2">Operador CEDIS</div></button>
         </div>
       </div>
     </div>
@@ -241,6 +254,10 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
               if ($rol_id === 1) $rolText = "Administrador";
               elseif ($rol_id === 3) $rolText = "Proveedor";
               elseif ($rol_id === 4) $rolText = "Repartidor";
+              elseif ($rol_id === 5) {
+                  $cedisNombre = htmlspecialchars($row["cedis_nombre"] ?? "Sin CEDIS");
+                  $rolText = "Operador CEDIS (" . $cedisNombre . ")";
+              }
 
               // Mapeo visual de Estado
               $estadoClass = "overlay-6";
@@ -361,6 +378,7 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
             <option value="2" selected>Cliente</option>
             <option value="3">Proveedor</option>
             <option value="4">Repartidor</option>
+            <option value="5">Operador CEDIS</option>
           </select>
         </div>
         <div class="form-group">
@@ -370,6 +388,19 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
             <option value="0">Inactivo</option>
           </select>
         </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; display: none;" id="crear-grupo-cedis">
+        <div class="form-group">
+          <label class="form-label">CEDIS Asignado *</label>
+          <select name="cedis_id" id="crear_cedis_id" class="form-select" disabled>
+            <option value="">Selecciona un CEDIS...</option>
+            <?php foreach ($cedisList as $ced): ?>
+              <option value="<?php echo $ced['id']; ?>"><?php echo htmlspecialchars($ced['nombre']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div></div>
       </div>
 
       <div class="modal-actions" style="margin-top: 15px;">
@@ -445,6 +476,7 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
             <option value="2">Cliente</option>
             <option value="3">Proveedor</option>
             <option value="4">Repartidor</option>
+            <option value="5">Operador CEDIS</option>
           </select>
         </div>
         <div class="form-group">
@@ -454,6 +486,19 @@ $countUsers = $resultUsers ? $resultUsers->num_rows : 0;
             <option value="0">Inactivo</option>
           </select>
         </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; display: none;" id="edit-grupo-cedis">
+        <div class="form-group">
+          <label class="form-label">CEDIS Asignado *</label>
+          <select name="cedis_id" id="edit_cedis_id" class="form-select" disabled>
+            <option value="">Selecciona un CEDIS...</option>
+            <?php foreach ($cedisList as $ced): ?>
+              <option value="<?php echo $ced['id']; ?>"><?php echo htmlspecialchars($ced['nombre']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div></div>
       </div>
 
       <div class="modal-actions" style="margin-top: 15px;">
@@ -521,6 +566,9 @@ function abrirModalEditar(id) {
                 }
                 
                 document.getElementById('edit_rol_id').value = res.data.rol_id;
+                if (String(res.data.rol_id) === '5') {
+                    document.getElementById('edit_cedis_id').value = res.data.cedis_id || '';
+                }
                 // Forzar la actualización del toggler después de cargar la data
                 const event = new Event('change');
                 document.getElementById('edit_rol_id').dispatchEvent(event);
@@ -563,6 +611,7 @@ function actualizarVistaUsuarios() {
         else if (onclickAttr.includes("'2'")) activeRol = '2';
         else if (onclickAttr.includes("'3'")) activeRol = '3';
         else if (onclickAttr.includes("'4'")) activeRol = '4';
+        else if (onclickAttr.includes("'5'")) activeRol = '5';
     }
 
     const rows = document.querySelectorAll('#tablaCuerpo .row-usuario');
@@ -660,11 +709,13 @@ function filtrarRol(rol, btn) {
     actualizarVistaUsuarios();
 }
 
-// Función para alternar la visualización del desplegable de Zona según el rol (solo Repartidor)
-function configurarAlternanciaDireccion(rolSelectId, zoneGrpId, zoneInputId) {
+// Función para alternar la visualización del desplegable de Zona según el rol (Repartidor o Operador CEDIS)
+function configurarAlternanciaRoles(rolSelectId, zoneGrpId, zoneInputId, cedisGrpId, cedisInputId) {
     const rolSelect = document.getElementById(rolSelectId);
     const zoneGrp = document.getElementById(zoneGrpId);
     const zoneInput = document.getElementById(zoneInputId);
+    const cedisGrp = document.getElementById(cedisGrpId);
+    const cedisInput = document.getElementById(cedisInputId);
 
     if (!rolSelect) return;
 
@@ -672,9 +723,21 @@ function configurarAlternanciaDireccion(rolSelectId, zoneGrpId, zoneInputId) {
         if (rolSelect.value === '4') { // 4 = Repartidor
             zoneGrp.style.display = 'grid';
             zoneInput.disabled = false;
+            
+            if (cedisGrp) cedisGrp.style.display = 'none';
+            if (cedisInput) cedisInput.disabled = true;
+        } else if (rolSelect.value === '5') { // 5 = Operador CEDIS
+            zoneGrp.style.display = 'none';
+            zoneInput.disabled = true;
+            
+            if (cedisGrp) cedisGrp.style.display = 'grid';
+            if (cedisInput) cedisInput.disabled = false;
         } else {
             zoneGrp.style.display = 'none';
             zoneInput.disabled = true;
+            
+            if (cedisGrp) cedisGrp.style.display = 'none';
+            if (cedisInput) cedisInput.disabled = true;
         }
     }
 
@@ -686,13 +749,13 @@ function configurarAlternanciaDireccion(rolSelectId, zoneGrpId, zoneInputId) {
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
         actualizarVistaUsuarios();
-        configurarAlternanciaDireccion('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona');
-        configurarAlternanciaDireccion('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona');
+        configurarAlternanciaRoles('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona', 'crear-grupo-cedis', 'crear_cedis_id');
+        configurarAlternanciaRoles('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona', 'edit-grupo-cedis', 'edit_cedis_id');
     });
 } else {
     actualizarVistaUsuarios();
-    configurarAlternanciaDireccion('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona');
-    configurarAlternanciaDireccion('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona');
+    configurarAlternanciaRoles('crear_rol_id', 'crear-grupo-direccion-zona', 'crear_direccion_zona', 'crear-grupo-cedis', 'crear_cedis_id');
+    configurarAlternanciaRoles('edit_rol_id', 'edit-grupo-direccion-zona', 'edit_direccion_zona', 'edit-grupo-cedis', 'edit_cedis_id');
 }
 </script>
 </body>

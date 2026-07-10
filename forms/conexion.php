@@ -357,4 +357,21 @@ $resColInvMerma = $conn->query("SHOW COLUMNS FROM `inventario_huevos` LIKE 'merm
 if ($resColInvMerma && $resColInvMerma->num_rows === 0) {
     $conn->query("ALTER TABLE `inventario_huevos` ADD COLUMN `merma` INT NOT NULL DEFAULT 0");
 }
+
+// 9.9.5 MIGRACIÓN AUTOMÁTICA: AGREGAR cedis_id A LA TABLA usuarios PARA OPERADORES DE CEDIS
+$resColCedisId = $conn->query("SHOW COLUMNS FROM `usuarios` LIKE 'cedis_id'");
+if ($resColCedisId && $resColCedisId->num_rows === 0) {
+    $conn->query("ALTER TABLE `usuarios` ADD COLUMN `cedis_id` INT NULL");
+    $conn->query("ALTER TABLE `usuarios` ADD CONSTRAINT `fk_usuarios_cedis` FOREIGN KEY (`cedis_id`) REFERENCES `cedis`(`id`) ON DELETE SET NULL");
+}
+
+// 9.9.6 MIGRACIÓN AUTOMÁTICA: AGREGAR merma_recepcion Y no_viable_recepcion A detalle_entrega_cedis
+$resColDetMerma = $conn->query("SHOW COLUMNS FROM `detalle_entrega_cedis` LIKE 'merma_recepcion'");
+if ($resColDetMerma && $resColDetMerma->num_rows === 0) {
+    $conn->query("ALTER TABLE `detalle_entrega_cedis` ADD COLUMN `merma_recepcion` INT NOT NULL DEFAULT 0");
+}
+$resColDetNoViable = $conn->query("SHOW COLUMNS FROM `detalle_entrega_cedis` LIKE 'no_viable_recepcion'");
+if ($resColDetNoViable && $resColDetNoViable->num_rows === 0) {
+    $conn->query("ALTER TABLE `detalle_entrega_cedis` ADD COLUMN `no_viable_recepcion` INT NOT NULL DEFAULT 0");
+}
 ?>

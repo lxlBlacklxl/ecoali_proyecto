@@ -27,6 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $password = trim($_POST["password"] ?? "");
         $rol_id = (int)($_POST["rol_id"] ?? 2);
         $activo = (int)($_POST["activo"] ?? 1);
+        $cedis_id = ($rol_id === 5 && !empty($_POST["cedis_id"])) ? (int)$_POST["cedis_id"] : null;
         
         $nombre = trim($_POST["nombre"] ?? "");
         $apellido = trim($_POST["apellido"] ?? "");
@@ -54,9 +55,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $password_hash = password_hash($password, PASSWORD_BCRYPT);
 
         // Insertar en la tabla usuarios
-        $sqlUser = "INSERT INTO usuarios (usuario, password_hash, rol_id, activo) VALUES (?, ?, ?, ?)";
+        $sqlUser = "INSERT INTO usuarios (usuario, password_hash, rol_id, activo, cedis_id) VALUES (?, ?, ?, ?, ?)";
         $stmtUser = $conn->prepare($sqlUser);
-        $stmtUser->bind_param("ssii", $usuario, $password_hash, $rol_id, $activo);
+        $stmtUser->bind_param("ssiii", $usuario, $password_hash, $rol_id, $activo, $cedis_id);
 
         if ($stmtUser->execute()) {
             $nuevo_usuario_id = $conn->insert_id;
@@ -81,6 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $password = trim($_POST["password"] ?? "");
         $rol_id = (int)($_POST["rol_id"] ?? 2);
         $activo = (int)($_POST["activo"] ?? 1);
+        $cedis_id = ($rol_id === 5 && !empty($_POST["cedis_id"])) ? (int)$_POST["cedis_id"] : null;
         
         $nombre = trim($_POST["nombre"] ?? "");
         $apellido = trim($_POST["apellido"] ?? "");
@@ -98,14 +100,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if (!empty($password)) {
             // Si el admin digitó una nueva contraseña
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
-            $sqlUser = "UPDATE usuarios SET usuario = ?, password_hash = ?, rol_id = ?, activo = ? WHERE id = ?";
+            $sqlUser = "UPDATE usuarios SET usuario = ?, password_hash = ?, rol_id = ?, activo = ?, cedis_id = ? WHERE id = ?";
             $stmtUser = $conn->prepare($sqlUser);
-            $stmtUser->bind_param("ssiii", $usuario, $password_hash, $rol_id, $activo, $id);
+            $stmtUser->bind_param("ssiiii", $usuario, $password_hash, $rol_id, $activo, $cedis_id, $id);
         } else {
             // Si conserva la misma contraseña
-            $sqlUser = "UPDATE usuarios SET usuario = ?, rol_id = ?, activo = ? WHERE id = ?";
+            $sqlUser = "UPDATE usuarios SET usuario = ?, rol_id = ?, activo = ?, cedis_id = ? WHERE id = ?";
             $stmtUser = $conn->prepare($sqlUser);
-            $stmtUser->bind_param("siii", $usuario, $rol_id, $activo, $id);
+            $stmtUser->bind_param("siiii", $usuario, $rol_id, $activo, $cedis_id, $id);
         }
 
         if ($stmtUser->execute()) {
@@ -170,7 +172,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && $accion === "obtener") {
         exit;
     }
 
-    $sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, up.nombre, up.apellido, up.email, up.telefono, up.direccion 
+    $sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, u.cedis_id, up.nombre, up.apellido, up.email, up.telefono, up.direccion 
             FROM usuarios u 
             LEFT JOIN usuario_perfil up ON u.id = up.usuario_id 
             WHERE u.id = ?";

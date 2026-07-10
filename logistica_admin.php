@@ -333,7 +333,8 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
           'logistica_admin.php' => 'Logística',
           'reportes_admin.php' => 'Reportes',
           'regalias_admin.php' => 'Regalías',
-          'bitacora_admin.php' => 'Bitácora'
+          'bitacora_admin.php' => 'Bitácora',
+          'cedis_admin.php' => 'CEDIS'
       ];
 
       foreach ($menu_items as $href => $label) {

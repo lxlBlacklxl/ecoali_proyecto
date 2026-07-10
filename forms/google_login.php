@@ -36,7 +36,7 @@ if (empty($email)) {
     exit;
 }
 
-$sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, up.nombre, up.apellido, up.email
+$sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, u.cedis_id, up.nombre, up.apellido, up.email
         FROM usuarios u
         INNER JOIN usuario_perfil up ON u.id = up.usuario_id
         WHERE up.email = ?";
@@ -74,7 +74,7 @@ if ($resultado->num_rows === 0) {
         exit;
     }
 
-    $sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, up.nombre, up.apellido, up.email
+    $sql = "SELECT u.id, u.usuario, u.rol_id, u.activo, u.cedis_id, up.nombre, up.apellido, up.email
             FROM usuarios u
             INNER JOIN usuario_perfil up ON u.id = up.usuario_id
             WHERE u.id = ?";
@@ -99,6 +99,7 @@ $_SESSION["rol_id"] = $user["rol_id"];
 $_SESSION["nombre"] = $user["nombre"];
 $_SESSION["apellido"] = $user["apellido"];
 $_SESSION["email"] = $user["email"];
+$_SESSION["cedis_id"] = $user["cedis_id"];
 
 if ((int)$user["rol_id"] === 1) {
     $_SESSION["admin_session"] = [
@@ -126,6 +127,10 @@ switch ((int)$user["rol_id"]) {
 
     case 4:
         header("Location: ../dashboard_repartidor.php");
+        break;
+
+    case 5:
+        header("Location: ../dashboard_cedis.php");
         break;
 
     default:
