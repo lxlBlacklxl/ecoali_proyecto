@@ -81,16 +81,17 @@ try {
             throw new Exception("El producto '" . $prodData["nombre"] . "' ya no se encuentra activo.");
         }
 
-        // Calcular stock disponible actual en lotes para este producto
+        // Calcular stock disponible actual en lotes para este producto (en unidades de cartón)
         $stmtStock = $conn->prepare("SELECT SUM(cantidad) FROM inventario_huevos WHERE producto_id = ? AND estado IN ('disponible', 'bajo_stock') AND cantidad > 0");
         $stmtStock->bind_param("i", $prod_id);
         $stmtStock->execute();
         $resStock = $stmtStock->get_result();
         $stockRow = $resStock->fetch_row();
-        $stock_disponible = (int)($stockRow[0] ?? 0);
+        $stock_huevos = (int)($stockRow[0] ?? 0);
+        $stock_cartones = (int)floor($stock_huevos / 30);
 
-        if ($stock_disponible < $cantidad) {
-            throw new Exception("Disculpe, no hay suficiente stock disponible para '" . $prodData["nombre"] . "'. Stock actual: " . $stock_disponible . " unidades.");
+        if ($stock_cartones < $cantidad) {
+            throw new Exception("Disculpe, no hay suficiente stock disponible para '" . $prodData["nombre"] . "'. Stock actual: " . $stock_cartones . " cartones.");
         }
 
         $precio_real = (float)$prodData["precio"];
@@ -109,7 +110,7 @@ try {
     // 2. DESCONTAR STOCK USANDO LOGÍSTICA FIFO (First In, First Out)
     foreach ($items_procesados as $item) {
         $prod_id = $item["id"];
-        $rem = $item["cantidad"];
+        $rem = $item["cantidad"] * 30; // Descontar huevos individuales (1 cartón = 30 huevos)
 
         $stmtLotes = $conn->prepare("SELECT id, cantidad FROM inventario_huevos WHERE producto_id = ? AND estado IN ('disponible', 'bajo_stock') AND cantidad > 0 ORDER BY fecha_postura ASC");
         $stmtLotes->bind_param("i", $prod_id);

@@ -111,7 +111,7 @@ try {
         
         while ($item = $resItems->fetch_assoc()) {
             $prod_id = (int)$item["producto_id"];
-            $cant_to_restore = (int)$item["cantidad"];
+            $cant_to_restore = (int)$item["cantidad"] * 30; // Reincorporar huevos individuales (1 cartón = 30 huevos)
 
             // Buscar el lote más reciente de ese producto para reintegrarle el stock
             $stmtLote = $conn->prepare("SELECT id, cantidad FROM inventario_huevos WHERE producto_id = ? ORDER BY id DESC LIMIT 1");

@@ -406,7 +406,7 @@ $detalles = $stmtDet->get_result()->fetch_all(MYSQLI_ASSOC);
                                 Tipo: <?php echo htmlspecialchars($it["tipo_huevo"]); ?> • Tamaño: <?php echo htmlspecialchars($it["tamano"]); ?>
                             </small>
                         </td>
-                        <td><?php echo $it["cantidad"]; ?> uds</td>
+                        <td><?php echo $it["cantidad"]; ?> cartón(es)</td>
                         <td style="text-align: right;">$<?php echo number_format($it["precio_unitario"], 2); ?></td>
                         <td style="text-align: right;">$<?php echo number_format($it["subtotal"], 2); ?></td>
                     </tr>
