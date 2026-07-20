@@ -229,6 +229,10 @@ if (!empty($pedidos)) {
   <link rel="stylesheet" href="assets/css/cliente.css?v=<?php echo time(); ?>">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
   
+  <!-- Leaflet Maps API -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -1117,6 +1121,27 @@ if (!empty($pedidos)) {
                 <p style="margin:0 0 16px; font-size:13px; font-weight:700; color:var(--text-medium);">
                   📦 Repartidor Asignado: <strong><?php echo htmlspecialchars($ped["repartidor_nombre"] ?? "Buscando conductor..."); ?></strong>
                 </p>
+
+                <?php if ($ped['estado'] === 'en_ruta'): ?>
+                  <div style="margin: 0 0 20px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(23,106,33,0.3); box-shadow: 0 4px 15px rgba(0,0,0,0.06); background: #ffffff;">
+                    <div style="background: var(--secondary); color: white; padding: 12px 16px; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+                      <span style="display: flex; align-items: center; gap: 8px;">📍 Ubicación del Repartidor en Tiempo Real</span>
+                      <span style="font-size: 11px; background: rgba(255,255,255,0.2); color: white; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; font-weight: 800;">🔴 En Ruta</span>
+                    </div>
+                    <div id="client-map-<?php echo $ped['id']; ?>" style="height: 260px; width: 100%; background: #f3f3f0; z-index: 1;"></div>
+                    <div style="padding: 10px 16px; background: #fdfcf7; font-size: 12px; color: var(--text-medium); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(213,164,112,0.15);">
+                      <span>🚚 Conductor: <strong><?php echo htmlspecialchars($ped["repartidor_nombre"] ?? "En servicio"); ?></strong></span>
+                      <span id="gps-status-time-<?php echo $ped['id']; ?>">Conectando GPS...</span>
+                    </div>
+                  </div>
+                  <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                      setTimeout(function() {
+                        iniciarMapaClienteGPS(<?php echo (int)$ped['id']; ?>);
+                      }, 300);
+                    });
+                  </script>
+                <?php endif; ?>
                 <table style="width:100%; border-collapse:collapse; text-align:left;">
                   <thead>
                     <tr style="border-bottom:2px solid var(--glass-border);">
@@ -2413,6 +2438,14 @@ if (!empty($pedidos)) {
   function toggleOrderDetails(id) {
       const pane = document.getElementById('order-details-' + id);
       pane.classList.toggle('active');
+      if (pane.classList.contains('active') && mapasClienteGPS[id]) {
+          setTimeout(function() {
+              mapasClienteGPS[id].map.invalidateSize();
+              if (mapasClienteGPS[id].marker) {
+                  mapasClienteGPS[id].map.setView(mapasClienteGPS[id].marker.getLatLng(), 15);
+              }
+          }, 200);
+      }
   }
 
   // Cancelación segura de pedido (Premium Custom Modal Dialog)
@@ -2793,6 +2826,69 @@ if (!empty($pedidos)) {
       window.speechSynthesis.onvoiceschanged = () => {
           window.speechSynthesis.getVoices();
       };
+  }
+
+  // --- RASTREO GPS DE REPARTIDORES EN TIEMPO REAL CON LEAFLET ---
+  const mapasClienteGPS = {};
+
+  function iniciarMapaClienteGPS(pedidoId) {
+    const containerId = 'client-map-' + pedidoId;
+    const container = document.getElementById(containerId);
+    if (!container || mapasClienteGPS[pedidoId]) return;
+
+    const defaultLat = 20.6736;
+    const defaultLng = -103.3440;
+
+    const map = L.map(containerId).setView([defaultLat, defaultLng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap - EcoAli Logística'
+    }).addTo(map);
+
+    const truckIcon = L.divIcon({
+      className: 'custom-driver-icon',
+      html: `<div style="background: #176a21; color: white; font-size: 18px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; border: 3px solid white; box-shadow: 0 4px 14px rgba(0,0,0,0.35);">🚚</div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    });
+
+    let marker = null;
+
+    function actualizarUbicacion() {
+      fetch('forms/obtener_ubicacion_pedido.php?pedido_id=' + pedidoId)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success' && data.lat !== null && data.lng !== null) {
+            const newPos = [data.lat, data.lng];
+            if (!marker) {
+              marker = L.marker(newPos, { icon: truckIcon }).addTo(map);
+            } else {
+              marker.setLatLng(newPos);
+            }
+            if (mapasClienteGPS[pedidoId]) {
+              mapasClienteGPS[pedidoId].marker = marker;
+            }
+            map.invalidateSize();
+            map.setView(newPos, 15);
+            const timeSpan = document.getElementById('gps-status-time-' + pedidoId);
+            if (timeSpan) {
+              timeSpan.innerHTML = `🟢 Señal GPS de las <strong>${new Date().toLocaleTimeString()}</strong>`;
+            }
+          } else {
+            const timeSpan = document.getElementById('gps-status-time-' + pedidoId);
+            if (timeSpan) {
+              timeSpan.innerHTML = `⚠️ Esperando señal GPS del repartidor...`;
+            }
+          }
+        })
+        .catch(e => console.log('Error al consultar GPS:', e));
+    }
+
+    actualizarUbicacion();
+    const intervalId = setInterval(actualizarUbicacion, 5000);
+    mapasClienteGPS[pedidoId] = { map: map, intervalId: intervalId };
+
+    setTimeout(() => { map.invalidateSize(); }, 500);
   }
 </script>
 

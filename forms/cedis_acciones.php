@@ -69,6 +69,7 @@ switch ($accion) {
         }
 
         echo json_encode(["status" => "success", "data" => $lotes]);
+        exit;
     case "obtener_detalle_pedido":
         $pedido_id = (int)($_GET["pedido_id"] ?? 0);
         if ($pedido_id <= 0) {
@@ -93,7 +94,7 @@ switch ($accion) {
         $cabecera = $resCab->fetch_assoc();
 
         // Obtener los detalles (productos y cantidades)
-        $sqlDet = "SELECT dp.cantidad, dp.precio_unitario, dp.subtotal, pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano
+        $sqlDet = "SELECT dp.cantidad, dp.precio_unitario, dp.subtotal, pr.id AS producto_id, pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano
                    FROM detalle_pedido dp
                    INNER JOIN productos pr ON dp.producto_id = pr.id
                    WHERE dp.pedido_id = ?";
@@ -103,6 +104,47 @@ switch ($accion) {
         $resDet = $stmtDet->get_result();
         $items = [];
         while ($row = $resDet->fetch_assoc()) {
+            $prod_id = (int)$row["producto_id"];
+            
+            // Buscar lotes sugeridos bajo criterio FIFO (fecha_postura ASC) en el CEDIS actual o en todos si es admin
+            $lotesSugeridos = [];
+            if (!empty($cedis_usuario_id)) {
+                $sqlLotes = "SELECT ih.codigo_lote, ih.cantidad, ih.fecha_postura, c.nombre AS cedis_nombre
+                             FROM inventario_huevos ih
+                             INNER JOIN detalle_entrega_cedis de_cedis ON ih.id = de_cedis.lote_id
+                             INNER JOIN entregas_cedis ec ON de_cedis.entrega_id = ec.id
+                             INNER JOIN cedis c ON ec.cedis_id = c.id
+                             WHERE ih.producto_id = ? AND ec.cedis_id = ? AND ec.estado = 'recibido' AND ih.cantidad > 0
+                             ORDER BY ih.fecha_postura ASC";
+                $stmtLotes = $conn->prepare($sqlLotes);
+                $stmtLotes->bind_param("ii", $prod_id, $cedis_usuario_id);
+            } else {
+                $sqlLotes = "SELECT ih.codigo_lote, ih.cantidad, ih.fecha_postura, c.nombre AS cedis_nombre
+                             FROM inventario_huevos ih
+                             INNER JOIN detalle_entrega_cedis de_cedis ON ih.id = de_cedis.lote_id
+                             INNER JOIN entregas_cedis ec ON de_cedis.entrega_id = ec.id
+                             INNER JOIN cedis c ON ec.cedis_id = c.id
+                             WHERE ih.producto_id = ? AND ec.estado = 'recibido' AND ih.cantidad > 0
+                             ORDER BY ih.fecha_postura ASC";
+                $stmtLotes = $conn->prepare($sqlLotes);
+                $stmtLotes->bind_param("i", $prod_id);
+            }
+            
+            if ($stmtLotes) {
+                $stmtLotes->execute();
+                $resLotes = $stmtLotes->get_result();
+                while ($lRow = $resLotes->fetch_assoc()) {
+                    $lotesSugeridos[] = [
+                        "codigo_lote" => $lRow["codigo_lote"],
+                        "cantidad" => (int)$lRow["cantidad"],
+                        "fecha_postura" => $lRow["fecha_postura"],
+                        "cedis_nombre" => $lRow["cedis_nombre"]
+                    ];
+                }
+                $stmtLotes->close();
+            }
+            
+            $row["lotes_sugeridos"] = $lotesSugeridos;
             $items[] = $row;
         }
 

@@ -2495,8 +2495,50 @@ function acceptStartRoute() {
             </button>
         </div>
 
+        </div>
+
     </div>
 </div>
+
+<script>
+// Transmisión continua de ubicación GPS cuando hay un pedido en ruta
+function iniciarTransmisionGps(pedidoId) {
+    if (!navigator.geolocation) return;
+    
+    function enviarCoordenadas() {
+        navigator.geolocation.getCurrentPosition(pos => {
+            fetch('forms/actualizar_ubicacion_repartidor.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pedido_id: pedidoId,
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                })
+            }).catch(e => console.log('Transmisión GPS error:', e));
+        }, err => console.log('Error de geolocalización:', err), {
+            enableHighAccuracy: true
+        });
+    }
+
+    enviarCoordenadas();
+    setInterval(enviarCoordenadas, 10000);
+}
+
+// Iniciar transmisión de GPS automáticamente para cualquier pedido activo en ruta
+document.addEventListener('DOMContentLoaded', function() {
+    <?php
+    $stmtEnRuta = $conn->prepare("SELECT id FROM pedidos WHERE repartidor_id = ? AND estado = 'en_ruta'");
+    $stmtEnRuta->bind_param("i", $_SESSION["usuario_id"]);
+    $stmtEnRuta->execute();
+    $resEnRuta = $stmtEnRuta->get_result();
+    while ($rRuta = $resEnRuta->fetch_assoc()) {
+        echo "iniciarTransmisionGps(" . (int)$rRuta["id"] . ");\n";
+    }
+    $stmtEnRuta->close();
+    ?>
+});
+</script>
 
 </body>
 </html>

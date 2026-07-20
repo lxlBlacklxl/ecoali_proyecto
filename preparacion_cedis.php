@@ -810,9 +810,64 @@ function abrirModalPreparar(pedidoId) {
                         <td><strong>${item.producto_nombre}</strong></td>
                         <td>${item.tipo_huevo}</td>
                         <td>${item.tamano}</td>
-                        <td style="text-align: center; font-size: 16px; font-weight: 800; color: var(--primary);">${item.cantidad}</td>
+                        <td style="text-align: center; font-size: 16px; font-weight: 800; color: var(--primary);">${item.cantidad} cartones</td>
                     `;
                     tbody.appendChild(tr);
+                    
+                    // Renderizar sugerencia FIFO
+                    if (item.lotes_sugeridos && item.lotes_sugeridos.length > 0) {
+                        const trFifo = document.createElement('tr');
+                        trFifo.style.background = 'rgba(255, 138, 0, 0.02)';
+                        
+                        let lotesHtml = '';
+                        item.lotes_sugeridos.forEach((l, idx) => {
+                            const fecha = new Date(l.fecha_postura);
+                            const fechaFormateada = (isNaN(fecha) || l.fecha_postura === '0000-00-00') ? 'Sin fecha' : l.fecha_postura.split('-').reverse().join('/');
+                            
+                            // Resaltar el primer lote (más antiguo)
+                            const esPrioritario = idx === 0;
+                            const badgeColor = esPrioritario ? 'background: rgba(255, 138, 0, 0.12); border: 1px solid rgba(255, 138, 0, 0.4); color: #fff;' : 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); color: var(--text-muted);';
+                            const checkIcon = esPrioritario ? '⚠️' : '📦';
+                            const prioritarioBadge = esPrioritario ? '<span style="background: var(--primary); color: #000; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">DEPLECIÓN PRIORITARIA</span>' : '';
+                            
+                            lotesHtml += `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin-bottom: 6px; border-radius: 10px; ${badgeColor}">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 14px;">${checkIcon}</span>
+                                        <strong>${l.codigo_lote}</strong>
+                                        <span style="font-size: 11px; opacity: 0.7;">Postura: ${fechaFormateada}</span>
+                                        ${prioritarioBadge}
+                                    </div>
+                                    <div style="font-weight: 700; font-size: 13px;">
+                                        Stock: ${l.cantidad} huevos
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        trFifo.innerHTML = `
+                            <td colspan="4" style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                                    <span>💡</span> RECOMENDACIÓN DE ROTACIÓN FIFO (DEPLECIÓN DE LOTES MÁS ANTIGUOS)
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    ${lotesHtml}
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(trFifo);
+                    } else {
+                        const trFifo = document.createElement('tr');
+                        trFifo.style.background = 'rgba(255, 74, 74, 0.03)';
+                        trFifo.innerHTML = `
+                            <td colspan="4" style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <div style="color: #ff4a4a; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                    <span>❌</span> No hay lotes disponibles en stock para este producto en este CEDIS.
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(trFifo);
+                    }
                 });
             } else {
                 tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ff4a4a;">${res.message}</td></tr>`;

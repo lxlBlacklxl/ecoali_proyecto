@@ -118,6 +118,51 @@ $pedidosListRes = $conn->query("SELECT p.id, p.fecha_pedido, p.total, up.nombre,
                                INNER JOIN usuario_perfil up ON p.cliente_id = up.usuario_id
                                WHERE p.estado = 'pendiente'
                                ORDER BY p.id ASC LIMIT 5");
+
+// --- CONSULTA DE ALERTAS DE STOCK MÍNIMO ---
+// Umbral de stock mínimo en unidades individuales de huevos
+$umbral_minimo = 500;
+$alertasStock = [];
+
+if ($rol_actual === 1) {
+    // Para Administradores: mostrar alertas agrupadas por CEDIS
+    $sqlAlertas = "SELECT pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano, c.nombre AS cedis_nombre,
+                          COALESCE(SUM(CASE WHEN ec.estado = 'recibido' THEN ih.cantidad ELSE 0 END), 0) as total_cantidad
+                   FROM productos pr
+                   CROSS JOIN cedis c
+                   LEFT JOIN inventario_huevos ih ON pr.id = ih.producto_id
+                   LEFT JOIN detalle_entrega_cedis de_cedis ON ih.id = de_cedis.lote_id
+                   LEFT JOIN entregas_cedis ec ON de_cedis.entrega_id = ec.id AND ec.cedis_id = c.id
+                   WHERE pr.activo = 1 AND c.activo = 1
+                   GROUP BY c.id, pr.id
+                   HAVING total_cantidad < ?
+                   ORDER BY c.nombre ASC, pr.nombre ASC";
+    $stmtAlertas = $conn->prepare($sqlAlertas);
+    $stmtAlertas->bind_param("i", $umbral_minimo);
+} else {
+    // Para Operadores: mostrar alertas solo de su CEDIS
+    $sqlAlertas = "SELECT pr.nombre AS producto_nombre, pr.tipo_huevo, pr.tamano, ? AS cedis_nombre,
+                          COALESCE(SUM(CASE WHEN ec.cedis_id = ? AND ec.estado = 'recibido' THEN ih.cantidad ELSE 0 END), 0) as total_cantidad
+                   FROM productos pr
+                   LEFT JOIN inventario_huevos ih ON pr.id = ih.producto_id
+                   LEFT JOIN detalle_entrega_cedis de_cedis ON ih.id = de_cedis.lote_id
+                   LEFT JOIN entregas_cedis ec ON de_cedis.entrega_id = ec.id AND ec.cedis_id = ?
+                   WHERE pr.activo = 1
+                   GROUP BY pr.id
+                   HAVING total_cantidad < ?
+                   ORDER BY pr.nombre ASC";
+    $stmtAlertas = $conn->prepare($sqlAlertas);
+    $stmtAlertas->bind_param("siii", $cedis_nombre, $cedis_usuario_id, $cedis_usuario_id, $umbral_minimo);
+}
+
+if ($stmtAlertas) {
+    $stmtAlertas->execute();
+    $resAlertas = $stmtAlertas->get_result();
+    while ($row = $resAlertas->fetch_assoc()) {
+        $alertasStock[] = $row;
+    }
+    $stmtAlertas->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -571,6 +616,60 @@ $pedidosListRes = $conn->query("SELECT p.id, p.fecha_pedido, p.total, up.nombre,
                 <div class="value"><?php echo number_format($mermasTotal); ?></div>
                 <div class="label">Mermas de Almacén</div>
             </div>
+        </section>
+
+        <!-- Alertas de Stock Mínimo -->
+        <section class="section-card" style="margin-bottom: 40px; border-color: <?php echo count($alertasStock) > 0 ? 'rgba(255, 74, 74, 0.3)' : 'rgba(57, 229, 93, 0.2)'; ?>;">
+            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <span>⚠️ Alertas de Stock Crítico</span>
+                <span style="font-size: 11px; font-weight: 800; background: <?php echo count($alertasStock) > 0 ? 'rgba(255, 74, 74, 0.15)' : 'rgba(57, 229, 93, 0.15)'; ?>; color: <?php echo count($alertasStock) > 0 ? '#ff4a4a' : '#39e55d'; ?>; padding: 4px 10px; border-radius: 20px; text-transform: uppercase;">
+                    <?php echo count($alertasStock); ?> alertas activas
+                </span>
+            </h2>
+            
+            <?php if (count($alertasStock) > 0): ?>
+                <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 20px 0;">Los siguientes productos se encuentran por debajo del nivel mínimo sugerido de <strong>500 unidades</strong>:</p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Tipo Huevo</th>
+                            <th>Tamaño</th>
+                            <th>CEDIS</th>
+                            <th style="text-align: right;">Stock Disponible</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($alertasStock as $al): ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($al["producto_nombre"]); ?></strong></td>
+                                <td><?php echo htmlspecialchars($al["tipo_huevo"]); ?></td>
+                                <td><?php echo htmlspecialchars($al["tamano"]); ?></td>
+                                <td><span style="color: var(--text-muted);"><?php echo htmlspecialchars($al["cedis_nombre"]); ?></span></td>
+                                <td style="text-align: right; font-weight: 800; color: <?php echo $al["total_cantidad"] == 0 ? '#ff4a4a' : '#ff9f29'; ?>;">
+                                    <?php echo number_format($al["total_cantidad"]); ?> uds
+                                </td>
+                                <td>
+                                    <?php if ($al["total_cantidad"] == 0): ?>
+                                        <span class="badge" style="background: rgba(255, 74, 74, 0.15); color: #ff4a4a; border: 1px solid rgba(255, 74, 74, 0.25);">Agotado</span>
+                                    <?php else: ?>
+                                        <span class="badge" style="background: rgba(255, 159, 41, 0.15); color: #ff9f29; border: 1px solid rgba(255, 159, 41, 0.25);">Stock Bajo</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <div style="display: flex; align-items: center; gap: 15px; padding: 5px 0;">
+                    <div style="font-size: 20px; background: rgba(57, 229, 93, 0.1); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #39e55d;">✓</div>
+                    <div>
+                        <h4 style="margin: 0; color: var(--text-light); font-size: 14px;">Todos los productos tienen stock suficiente</h4>
+                        <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 12px;">El inventario de todos los productos en este Centro de Distribución supera las 500 unidades.</p>
+                    </div>
+                </div>
+            <?php endif; ?>
         </section>
 
         <!-- Content Grid -->
