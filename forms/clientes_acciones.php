@@ -60,7 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
 
             // Validar que el email no exista
-            $stmtMailCheck = $conn->prepare("SELECT id FROM usuario_perfil WHERE email = ?");
+            $stmtMailCheck = $conn->prepare("SELECT usuario_id FROM usuario_perfil WHERE email = ?");
             $stmtMailCheck->bind_param("s", $email);
             $stmtMailCheck->execute();
             if ($stmtMailCheck->get_result()->num_rows > 0) {
@@ -125,7 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
 
             // Validar email único
-            $stmtMailCheck = $conn->prepare("SELECT id FROM usuario_perfil WHERE email = ? AND usuario_id != ?");
+            $stmtMailCheck = $conn->prepare("SELECT usuario_id FROM usuario_perfil WHERE email = ? AND usuario_id != ?");
             $stmtMailCheck->bind_param("si", $email, $usuario_id);
             $stmtMailCheck->execute();
             if ($stmtMailCheck->get_result()->num_rows > 0) {
