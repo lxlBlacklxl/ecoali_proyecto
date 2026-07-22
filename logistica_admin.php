@@ -128,6 +128,9 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
 <link rel="stylesheet" href="assets/css/globals.css">
 <link rel="stylesheet" href="assets/css/inventario_admin.css?v=<?php echo time(); ?>">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<!-- Leaflet Maps API -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="assets/js/admin_menu.js" defer></script>
 <style>
   /* ── Inline repartidor select ── */
@@ -756,6 +759,15 @@ $repartidoresJSON = json_encode($repartidoresJS, JSON_HEX_APOS | JSON_HEX_TAG);
         </select>
       </div>
 
+      <!-- Real-Time GPS Tracking Map for Admins -->
+      <div class="form-group" id="admin-map-container" style="display: none; margin-top: 15px;">
+        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>📍 Ubicación del Repartidor (Tiempo Real)</span>
+          <span id="admin-gps-status-time" style="font-size: 11px; color: var(--secondary); font-weight: 800;">Conectando...</span>
+        </label>
+        <div id="admin-tracking-map" style="height: 240px; width: 100%; border-radius: 12px; border: 1px solid rgba(213,164,112,0.22); background: #f3f3f0; z-index: 1;"></div>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="cerrarModal('modalEditar')">Cancelar</button>
         <button type="submit" class="btn-submit">Guardar Cambios</button>
@@ -1211,6 +1223,97 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+let adminMap = null;
+let adminMarker = null;
+let adminGpsInterval = null;
+
+function detenerRastreoAdmin() {
+    if (adminGpsInterval) {
+        clearInterval(adminGpsInterval);
+        adminGpsInterval = null;
+    }
+    if (adminMap) {
+        adminMap.remove();
+        adminMap = null;
+        adminMarker = null;
+    }
+    const mapCont = document.getElementById('admin-map-container');
+    if (mapCont) mapCont.style.display = 'none';
+}
+
+function iniciarRastreoAdmin(pedidoId) {
+    detenerRastreoAdmin();
+
+    const container = document.getElementById('admin-tracking-map');
+    if (!container) return;
+
+    document.getElementById('admin-map-container').style.display = 'block';
+
+    const defaultLat = 20.6736;
+    const defaultLng = -103.3440;
+
+    adminMap = L.map('admin-tracking-map').setView([defaultLat, defaultLng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap - EcoAli Logística'
+    }).addTo(adminMap);
+
+    const truckIcon = L.divIcon({
+        className: 'custom-driver-icon',
+        html: `<div style="background: #176a21; color: white; font-size: 16px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">🚚</div>`,
+        iconSize: [38, 38],
+        iconAnchor: [19, 19]
+    });
+
+    function actualizarPosicion() {
+        fetch('forms/obtener_ubicacion_pedido.php?pedido_id=' + pedidoId)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success' && data.lat !== null && data.lng !== null) {
+                    const newPos = [data.lat, data.lng];
+                    if (!adminMarker) {
+                        adminMarker = L.marker(newPos, { icon: truckIcon }).addTo(adminMap);
+                    } else {
+                        adminMarker.setLatLng(newPos);
+                    }
+                    adminMap.invalidateSize();
+                    adminMap.setView(newPos, 15);
+                    const statusEl = document.getElementById('admin-gps-status-time');
+                    if (statusEl) {
+                        statusEl.innerHTML = `🟢 Señal: <strong>${new Date().toLocaleTimeString()}</strong>`;
+                    }
+                } else {
+                    const statusEl = document.getElementById('admin-gps-status-time');
+                    if (statusEl) {
+                        statusEl.innerHTML = `⚠️ Esperando señal GPS...`;
+                    }
+                }
+            })
+            .catch(e => console.log('Error de rastreo admin:', e));
+    }
+
+    actualizarPosicion();
+    adminGpsInterval = setInterval(actualizarPosicion, 5000);
+    setTimeout(() => { 
+        if (adminMap) adminMap.invalidateSize(); 
+    }, 300);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selectEstado = document.getElementById('edit_estado');
+    if (selectEstado) {
+        selectEstado.addEventListener('change', function() {
+            const estado = this.value;
+            const pedidoId = document.getElementById('edit_id').value;
+            if (estado === 'en_ruta') {
+                iniciarRastreoAdmin(pedidoId);
+            } else {
+                detenerRastreoAdmin();
+            }
+        });
+    }
+});
+
 function abrirModalEditar(id) {
     fetch('forms/logistica_acciones.php?accion=obtener&id=' + id)
         .then(response => response.json())
@@ -1223,6 +1326,14 @@ function abrirModalEditar(id) {
                 document.getElementById('edit_estado').value = res.data.estado;
                 
                 document.getElementById('modalEditar').classList.add('active');
+
+                if (res.data.estado === 'en_ruta') {
+                    setTimeout(() => {
+                        iniciarRastreoAdmin(id);
+                    }, 200);
+                } else {
+                    detenerRastreoAdmin();
+                }
             } else {
                 alert('Error al obtener datos del pedido: ' + res.message);
             }
@@ -1240,6 +1351,9 @@ function confirmarEliminar(id) {
 
 function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
+    if (id === 'modalEditar') {
+        detenerRastreoAdmin();
+    }
 }
 
 /**
