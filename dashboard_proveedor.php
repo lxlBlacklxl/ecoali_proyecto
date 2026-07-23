@@ -116,21 +116,7 @@ $resEntRec = $stmtEntRec->get_result();
 $entregasRecibidas = (int)($resEntRec->fetch_row()[0] ?? 0);
 $stmtEntRec->close();
 
-// K. Datos para gráficos (Últimos 7 días)
-$fechas_7dias = [];
-$produccion_7dias = [];
-for ($i = 6; $i >= 0; $i--) {
-    $fecha = date('Y-m-d', strtotime("-$i days"));
-    $fechas_7dias[] = date('d/m', strtotime($fecha));
-    
-    $stmtG = $conn->prepare("SELECT SUM(cantidad) FROM produccion WHERE proveedor_id = ? AND fecha_produccion = ?");
-    $stmtG->bind_param("is", $proveedor_id, $fecha);
-    $stmtG->execute();
-    $resG = $stmtG->get_result();
-    $prod_dia = (int)($resG->fetch_row()[0] ?? 0);
-    $produccion_7dias[] = $prod_dia;
-    $stmtG->close();
-}
+
 
 
 // 4. TABLAR DE INFORMACIÓN RECIENTE
@@ -318,6 +304,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 
     <!-- Gráficos Interactivos -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2 style="margin: 0; font-size: 18px; color: var(--text-dark);">Análisis de Producción</h2>
+      <div class="chart-filters" style="display: flex; gap: 10px; background: white; padding: 4px; border-radius: 8px; border: 1px solid var(--glass-border);">
+        <button class="filter-btn active" data-filter="7d" style="border: none; background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">7 Días</button>
+        <button class="filter-btn" data-filter="30d" style="border: none; background: transparent; color: var(--text-medium); padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">30 Días</button>
+        <button class="filter-btn" data-filter="1y" style="border: none; background: transparent; color: var(--text-medium); padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;">1 Año</button>
+      </div>
+    </div>
     <div class="charts-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 30px;">
       <div class="card chart-card" style="padding: 20px;">
         <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 15px; color: var(--text-dark);">Tendencia de Producción (Últimos 7 días)</h3>
@@ -742,123 +736,152 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Datos desde PHP
-    const fechas = <?php echo json_encode($fechas_7dias); ?>;
-    const produccion = <?php echo json_encode($produccion_7dias); ?>;
-    
-    const viables = <?php echo $huevosProducidos; ?>;
-    const noViables = <?php echo $huevosNoViables; ?>;
-    const mermas = <?php echo $huevosMermas; ?>;
+    let trendChartInstance = null;
+    let qualityChartInstance = null;
 
-    // Gráfico de Tendencia (Líneas)
     const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    const ctxQuality = document.getElementById('qualityChart').getContext('2d');
     
-    // Gradiente para el área
     let gradientTrend = ctxTrend.createLinearGradient(0, 0, 0, 250);
     gradientTrend.addColorStop(0, 'rgba(255, 138, 0, 0.4)');
     gradientTrend.addColorStop(1, 'rgba(255, 138, 0, 0.0)');
 
-    new Chart(ctxTrend, {
-        type: 'line',
-        data: {
-            labels: fechas,
-            datasets: [{
-                label: 'Huevos Viables',
-                data: produccion,
-                borderColor: '#ff8a00',
-                backgroundColor: gradientTrend,
-                borderWidth: 3,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: '#ff8a00',
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true,
-                tension: 0.4 // Curvas suaves
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 10,
-                    titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 13 },
-                    bodyFont: { family: "'Manrope', sans-serif", size: 14, weight: 'bold' },
-                    displayColors: false,
-                    callbacks: {
-                        label: function(context) {
-                            return context.parsed.y + ' uds';
+    function initCharts(data) {
+        if (trendChartInstance) trendChartInstance.destroy();
+        if (qualityChartInstance) qualityChartInstance.destroy();
+
+        trendChartInstance = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: data.fechas,
+                datasets: [{
+                    label: 'Huevos Viables',
+                    data: data.produccion,
+                    borderColor: '#ff8a00',
+                    backgroundColor: gradientTrend,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#ff8a00',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        padding: 10,
+                        titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 13 },
+                        bodyFont: { family: "'Manrope', sans-serif", size: 14, weight: 'bold' },
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return context.parsed.y + ' uds';
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
-                    ticks: { font: { family: "'Manrope', sans-serif", size: 11 }, color: '#64748b' }
                 },
-                x: {
-                    grid: { display: false, drawBorder: false },
-                    ticks: { font: { family: "'Manrope', sans-serif", size: 11 }, color: '#64748b' }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index',
-            },
-        }
-    });
-
-    // Gráfico de Calidad (Dona)
-    const ctxQuality = document.getElementById('qualityChart').getContext('2d');
-    new Chart(ctxQuality, {
-        type: 'doughnut',
-        data: {
-            labels: ['Viables', 'No Viables', 'Mermas'],
-            datasets: [{
-                data: [viables, noViables, mermas],
-                backgroundColor: [
-                    '#176a21', // Verde success
-                    '#c27c0e', // Naranja warn
-                    '#b02500'  // Rojo danger
-                ],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 15,
-                        font: { family: "'Manrope', sans-serif", size: 12, weight: '600' },
-                        color: '#334155'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
+                        ticks: { font: { family: "'Manrope', sans-serif", size: 11 }, color: '#64748b' }
+                    },
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { font: { family: "'Manrope', sans-serif", size: 11 }, color: '#64748b' }
                     }
                 },
-                tooltip: {
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 10,
-                    bodyFont: { family: "'Manrope', sans-serif", size: 13, weight: 'bold' },
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) { label += ': '; }
-                            label += context.parsed + ' uds';
-                            return label;
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+            }
+        });
+
+        qualityChartInstance = new Chart(ctxQuality, {
+            type: 'doughnut',
+            data: {
+                labels: ['Viables', 'No Viables', 'Mermas'],
+                datasets: [{
+                    data: [data.calidad.viables, data.calidad.noViables, data.calidad.mermas],
+                    backgroundColor: ['#176a21', '#c27c0e', '#b02500'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            font: { family: "'Manrope', sans-serif", size: 12, weight: '600' },
+                            color: '#334155'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        padding: 10,
+                        bodyFont: { family: "'Manrope', sans-serif", size: 13, weight: 'bold' },
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) { label += ': '; }
+                                label += context.parsed + ' uds';
+                                return label;
+                            }
                         }
                     }
                 }
             }
-        }
+        });
+    }
+
+    function loadChartData(filter) {
+        fetch(`forms/get_chart_data.php?filter=${filter}`)
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    console.error(data.error);
+                    return;
+                }
+                initCharts(data);
+            })
+            .catch(error => console.error('Error fetching chart data:', error));
+    }
+
+    // Event listeners para los botones de filtro
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Actualizar estilos de botones
+            filterBtns.forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = 'var(--text-medium)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = 'white';
+
+            // Cargar datos
+            const filter = this.getAttribute('data-filter');
+            loadChartData(filter);
+        });
     });
+
+    // Carga inicial
+    loadChartData('7d');
 });
 </script>

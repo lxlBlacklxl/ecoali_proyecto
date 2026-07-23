@@ -1,0 +1,2 @@
+id	usuario	password_hash	rol_id	activo	cedis_id
+3	Diego	$2y$10$5RUEqB8PZE4l6/bmt/XLU.veHElrzKgN2vgwll1Bu2QNDob/z.3ea	3	1	NULL
